@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <limits.h>
 
+#define SIZE 4096
+
 typedef struct node {
     char letter;
     unsigned int frequency;
@@ -16,34 +18,93 @@ typedef struct node {
     struct node *right;
 } node;
 
-#define SIZE 4096
+int *body;
+int body_length;
+node *head;
+node *new_tree_nodes[256];
+node *root;
 
-char *convert_hex_to_binary(char buff[]) {
-    int i;
-    int j;
-    char *bin_string;
-    bin_string = malloc(32);
-    /*
-    char temp;
-    for(i = 1; i <= 2; i++) {
-        temp = buff[i];
-        buff[i] = buff[5 - i];
-        buff[5 - i] = temp;
+void print_list() {
+    node *runner = head;
+    while(runner) {
+        printf("%c: %d\n", runner->letter, runner->frequency);
+        runner = runner->next;
     }
-     */
+}
 
-    printf("%c: ", buff[0]);
-    for(i = 1; i < 5; i++) {
-        for(j = 0; j < CHAR_BIT; j++)
-        {
-            bin_string[j] = buff[i]>>j&1;
-            /*
-            printf("%d", (buff[i]>>j)&1);
-             */
+void traverse_tree() {
+    int i;
+    node *current_node = root;
+    for(i = 0; i < body_length; i++) {
+        if(current_node->left == NULL && current_node->right == NULL) {
+            printf("%c", current_node->letter);
+            current_node = root;
+        }
+        if(body[i] == 0) {
+            current_node = current_node->left;
+        }
+        else if(body[i] == 1) {
+            current_node = current_node->right;
         }
     }
-    printf("%d\n", atoi(bin_string));
-    return bin_string;
+}
+
+void in_order_insert(node *n) {
+    node *runner;
+    if (head == NULL) {
+        head = n;
+        return;
+    }
+    if (n->frequency < head->frequency) {
+        n->next = head;
+        head = n;
+        return;
+    }
+
+    runner = head;
+    while (runner->next != NULL && n->frequency > runner->next->frequency) {
+        runner = runner->next;
+    }
+    n->next = runner->next;
+    runner->next = n;
+}
+
+void construct_tree(node *list_head) {
+    int i;
+    int node_sum;
+    node *node_one;
+    node *node_two;
+    node *new_parent;
+    node_one = list_head;
+    i = 0;
+    while (node_one->next != NULL) {
+        node_two = node_one->next;
+        head = node_two->next;
+        node_sum = node_one->frequency + node_two->frequency;
+        new_parent = (node *) malloc(sizeof(node));
+        if(!new_parent) {
+            perror("malloc");
+            exit(2);
+        }
+        new_parent->frequency = node_sum;
+        new_parent->left = node_one;
+        new_parent->right = node_two;
+        new_tree_nodes[i++] = new_parent;
+        in_order_insert(new_parent);
+        node_one->next = NULL;
+        node_two->next = NULL;
+        root = new_parent;
+        node_one = head;
+    }
+}
+
+void print_body() {
+    int i;
+    printf("body: ");
+    for(i = 0; i < body_length; i++) {
+        printf("%d", body[i]);
+    }
+    printf("\n");
 }
 
 void parse_file(int fd) {
@@ -51,55 +112,51 @@ void parse_file(int fd) {
     int num_unique_characters;
     int i;
     int j;
+    int k;
+    int pow_count;
     int size_read;
+    node *runner;
     unsigned int decimal;
-    /*
-    node *new_node;
-     */
 
     read(fd, buff, 1);
     num_unique_characters = buff[0];
     printf("Number of unique characters: %d\n", num_unique_characters + 1);
-    /*printf("header: ");*/
-    /*
-    for(j = 0; j < 8; j++) {
-        printf("%d", (buff[0]>>j)&1);
-    }
 
-    printf("\n");
-     */
     decimal = 0;
+    runner = head;
     for(i = 0; i < num_unique_characters + 1; i++) {
+        node *new_node = malloc(sizeof(node));
         read(fd, buff, 5);
-        /*
-        new_node = (node *) malloc(sizeof(node));
+        /*printf("%c: ", buff[0]);*/
         new_node->letter = buff[0];
-
-        decimal = convert_hex_to_decimal(buff);
-        new_node->frequency = decimal;
-
-        printf("%c: %d\n", new_node->letter, new_node->frequency);
-        convert_hex_to_binary(buff);
-        */
-        printf("%c: ", buff[0]);
-        for(j = 0; j < 32; j++) {
-            decimal = decimal + (pow(2, j) * ((buff[1]>>j)&1));
+        pow_count = 0;
+        for(j = 1; j < 5; j++) {
+            for(k = 0; k < 8; k++) {
+                decimal += (((buff[j]>>k)&1) * pow(2, pow_count));
+                pow_count++;
+            }
         }
-        printf("%d", decimal);
+        new_node->frequency = decimal;
+        if(i == 0) {
+            head = new_node;
+        } else {
+            runner->next = new_node;
+        }
+        runner = new_node;
+        /*printf("%d\n", decimal);*/
         decimal = 0;
-        printf("\n");
-
     }
 
-    printf("body: ");
+    body = malloc(400);
+    body_length = 0;
     size_read = read(fd, buff, SIZE);
     for(i = 0; i < size_read; i++) {
         unsigned char this_byte  = buff[i];
         for(j = 7; j >= 0; j--) {
-            printf("%d", ((this_byte>>j)&1));
+            body[body_length] = (this_byte>>j)&1;
+            body_length++;
         }
     }
-    printf("\n");
 }
 
 int main (int argc, char *argv[]) {
@@ -113,5 +170,9 @@ int main (int argc, char *argv[]) {
     fd = open(argv[1], O_RDONLY);
 
     parse_file(fd);
+    /*print_body();*/
+    /*print_list();*/
+    construct_tree(head);
+    traverse_tree();
     return(0);
 }
