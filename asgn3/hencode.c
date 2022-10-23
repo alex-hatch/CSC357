@@ -24,39 +24,23 @@ typedef struct letter_code {
 node *htable[256];
 node *head;
 node *root;
+char *out_file;
+int out_fd;
 node *new_tree_nodes[256];
 letter_code *codes[256];
 int num_codes = 0;
-/*
-void write_file() {
-    int out;
-    int num;
-    int i;
-
-    out = open("outfile", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-    num = num_codes - 1;
-    lseek(out, 0, SEEK_SET);
-    write(out, &num, 1);
-    for(i = 0; i < 255 && htable[i]->frequency == 0; i++);
-
-    for( ; htable[i] != NULL; i++) {
-        write(out, &(htable[i]->letter), 1);
-        write(out, &(htable[i]->frequency), 4);
-    }
-}
- */
 
 void free_codes() {
     int i;
-    for(i = 0; i < num_codes; i++) {
+    for (i = 0; i < num_codes; i++) {
         free(codes[i]->path);
         free(codes[i]);
     }
 }
 
-void print_codes()  {
+void print_codes() {
     int i;
-    for(i = 0; i < num_codes; i++) {
+    for (i = 0; i < num_codes; i++) {
         printf("0x%02x: %s\n", codes[i]->letter, codes[i]->path);
     }
 }
@@ -83,12 +67,11 @@ unsigned char binary_to_hex(char *bin) {
 }
 
 void write_file(int infile) {
-    int out;
     int i;
     int j;
     int num;
     char buff[SIZE];
-    char write_buff[SIZE];
+    char *write_buff;
     char this_char;
     unsigned char hex;
     char *concat_bin;
@@ -96,33 +79,36 @@ void write_file(int infile) {
     int k;
     int l;
 
-    out = open("outfile", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-    num = num_codes - 1;
-    write(out, &num, 1);
-    for(i = 0; i < 255 && htable[i]->frequency == 0; i++);
-
-    for( ; i < 256; i++) {
-        /*printf("Writing %hhx: %d\n", htable[i]->letter, htable[i]->frequency);*/
-        write(out, &(htable[i]->letter), 1);
-        write(out, &(htable[i]->frequency), 4);
+    if (out_fd != 1) {
+        out_fd = open(out_file, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
     }
-
-    if(out == -1) {
+    if (out_fd == -1) {
         perror("outfile");
         exit(2);
+    }
+
+    num = num_codes - 1;
+    write(out_fd, &num, 1);
+
+    for (i = 0; i < 255 && htable[i]->frequency == 0; i++);
+    for (; i < 256; i++) {
+        /*printf("Writing %hhx: %d\n", htable[i]->letter, htable[i]->frequency);*/
+        write(out_fd, &(htable[i]->letter), 1);
+        write(out_fd, &(htable[i]->frequency), 4);
     }
 
     lseek(infile, 0, SEEK_SET);
     concat_count = 0;
     concat_bin = malloc(8);
     l = 0;
-    while((num = read(infile, buff, SIZE))  > 0) {
-        for(i = 0; i < num; i++) {
+    write_buff = malloc(SIZE);
+    while ((num = read(infile, buff, SIZE)) > 0) {
+        for (i = 0; i < num; i++) {
             this_char = buff[i];
-            for(j = 0; j < 255; j++) {
-                if(codes[j] != NULL && this_char == codes[j]->letter) {
-                    for(k = 0; k < strlen(codes[j]->path); concat_count++) {
-                        if(concat_count == 8) {
+            for (j = 0; j < 255; j++) {
+                if (codes[j] != NULL && this_char == codes[j]->letter) {
+                    for (k = 0; k < strlen(codes[j]->path); concat_count++) {
+                        if (concat_count == 8) {
                             concat_bin[concat_count] = '\0';
                             /*printf("concat bin: %s\n", concat_bin);*/
                             hex = binary_to_hex(concat_bin);
@@ -130,7 +116,14 @@ void write_file(int infile) {
                             concat_bin = malloc(8);
                             /*printf("%hx\n", hex);*/
                             /*write(out, &hex, 1);*/
+                            /*printf("in\n");
+                            printf("l: %d\n", l);
+                             */
+                            if (l == SIZE - 1) {
+                                write_buff = realloc(write_buff, sizeof(write_buff) * 2);
+                            }
                             write_buff[l++] = hex;
+                            /*printf("out\n");*/
                             concat_count = 0;
                         }
                         concat_bin[concat_count] = codes[j]->path[k++];
@@ -146,14 +139,15 @@ void write_file(int infile) {
     /*printf("%hx\n", hex);*/
     write_buff[l++] = hex;
     /*write(out, &hex, 1);*/
-    write(out, write_buff, l);
+    write(out_fd, write_buff, l);
+    free(write_buff);
 }
 
 void free_tree_memory() {
     int i;
     i = 0;
 
-    while(new_tree_nodes[i] != NULL) {
+    while (new_tree_nodes[i] != NULL) {
         free(new_tree_nodes[i]);
         i++;
     }
@@ -164,26 +158,26 @@ void traverse_tree(node *r, char *code, int length) {
     letter_code *this_code;
     char *path;
 
-    if(r == NULL)
+    if (r == NULL)
         return;
-    if(r->left != NULL) {
+    if (r->left != NULL) {
         code[length] = '0';
         traverse_tree(r->left, code, length + 1);
     }
-    if(r->right != NULL) {
+    if (r->right != NULL) {
         code[length] = '1';
         traverse_tree(r->right, code, length + 1);
     }
     if (r->left == NULL && r->right == NULL) {
         code[length] = '\0';
         this_code = (letter_code *) malloc(sizeof(letter_code));
-        if(!this_code) {
+        if (!this_code) {
             perror("malloc");
             exit(7);
         }
         this_code->letter = r->letter;
         path = malloc(sizeof(16));
-        if(!path) {
+        if (!path) {
             perror("malloc");
             exit(8);
         }
@@ -200,8 +194,8 @@ void traverse_tree(node *r, char *code, int length) {
 
 void generate_huffman() {
     char *aux;
-    aux = (char*) malloc(16);
-    if(!aux) {
+    aux = (char *) malloc(16);
+    if (!aux) {
         perror("malloc");
         exit(1);
     }
@@ -250,7 +244,7 @@ void construct_tree(node *list_head) {
         head = node_two->next;
         node_sum = node_one->frequency + node_two->frequency;
         new_parent = (node *) malloc(sizeof(node));
-        if(!new_parent) {
+        if (!new_parent) {
             perror("malloc");
             exit(2);
         }
@@ -273,7 +267,6 @@ void print_linked_list(node *n) {
     }
     printf("null\n");
 }
-
 
 void construct_linked_list() {
     int i;
@@ -308,7 +301,7 @@ void build_htable(int fd) {
     int num;
     for (i = 0; i < 256; i++) {
         node *new_node = (node *) malloc(sizeof(node));
-        if(!new_node) {
+        if (!new_node) {
             perror("malloc");
             exit(3);
         }
@@ -316,15 +309,15 @@ void build_htable(int fd) {
         htable[i] = new_node;
     }
 
-    while((num = read(fd, buff, SIZE))  > 0) {
-        for(i = 0; i < num; i++) {
-            if (htable[(int)buff[i]]->frequency == 0) {
-                htable[(int)buff[i]]->letter = buff[i];
+    while ((num = read(fd, buff, SIZE)) > 0) {
+        for (i = 0; i < num; i++) {
+            if (htable[(int) buff[i]]->frequency == 0) {
+                htable[(int) buff[i]]->letter = buff[i];
             }
-            htable[(int)buff[i]]->frequency++;
+            htable[(int) buff[i]]->frequency++;
         }
     }
-    if(num < 0) {
+    if (num < 0) {
         perror("read");
         exit(6);
     }
@@ -332,50 +325,23 @@ void build_htable(int fd) {
 
 void free_memory_htable() {
     int i;
-    for(i = 0; i < 256; i++) {
+    for (i = 0; i < 256; i++) {
         free(htable[i]);
     }
-}
-
-void copy_file() {
-    int num;
-    char buff[SIZE];
-    int in, out;
-    in = open("test", O_RDONLY);
-    if(in == -1) {
-        perror("test");
-        exit(1);
-    }
-
-    out = open("outfile", O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
-
-    if(out == -1) {
-        printf("rip\n");
-        perror("outfile");
-        exit(2);
-    }
-
-    while((num = read(in,  buff, SIZE))  > 0) {
-        if(write(out, buff, num) < 0) {
-            perror("write");
-            exit(3);
-        }
-    }
-
-    if(num < 0) {
-        perror("read");
-        exit(4);
-    }
-    close(out);
-    close(in);
 }
 
 int main(int argc, char *argv[]) {
     int fd;
 
-    if (argc != 2) {
-        fprintf(stderr, "usage: ./hencode [file]\n");
+    if (argc > 3 || argc < 2) {
+        fprintf(stderr, "usage: ./hencode infile [ outfile ]\n");
         exit(4);
+    }
+
+    if (argc == 3) {
+        out_file = argv[2];
+    } else if (argc == 2) {
+        out_fd = 1;
     }
 
     fd = open(argv[1], O_RDONLY);
@@ -388,8 +354,6 @@ int main(int argc, char *argv[]) {
     construct_linked_list();
     construct_tree(head);
     generate_huffman();
-    /*print_codes();*/
-    /*write_header();*/
     write_file(fd);
     free_memory_htable();
     free_tree_memory();

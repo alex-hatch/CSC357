@@ -2,7 +2,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
@@ -23,6 +22,16 @@ int body_length;
 node *head;
 node *new_tree_nodes[256];
 node *root;
+char *out_file;
+int out_fd;
+
+void print_tree(node *r) {
+    if (r == NULL)
+        return;
+    print_tree(r->left);
+    printf("%c: %d\n", r->letter, r->frequency);
+    print_tree(r->right);
+}
 
 void print_list() {
     node *runner = head;
@@ -34,10 +43,21 @@ void print_list() {
 
 void traverse_tree() {
     int i;
+    int count;
+    char buff[100];
+
     node *current_node = root;
-    for(i = 0; i < body_length; i++) {
+    count = 0;
+    if(out_fd != 1) {
+        out_fd = open(out_file, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    }
+    for(i = 0; i <= body_length; i++) {
         if(current_node->left == NULL && current_node->right == NULL) {
-            printf("%c", current_node->letter);
+            buff[count++] = current_node->letter;
+            if(count == 100) {
+                write(out_fd, buff, 100);
+                count = 0;
+            }
             current_node = root;
         }
         if(body[i] == 0) {
@@ -47,6 +67,7 @@ void traverse_tree() {
             current_node = current_node->right;
         }
     }
+    write(out_fd, buff, count);
 }
 
 void in_order_insert(node *n) {
@@ -107,6 +128,16 @@ void print_body() {
     printf("\n");
 }
 
+int calculate_multiplier(int pow) {
+    int i;
+    int result;
+    result = 1;
+    for(i = 0; i < pow; i++) {
+        result *= 2;
+    }
+    return result;
+}
+
 void parse_file(int fd) {
     char buff[SIZE];
     int num_unique_characters;
@@ -117,11 +148,10 @@ void parse_file(int fd) {
     int size_read;
     node *runner;
     unsigned int decimal;
+    int count;
 
     read(fd, buff, 1);
     num_unique_characters = buff[0];
-    printf("Number of unique characters: %d\n", num_unique_characters + 1);
-
     decimal = 0;
     runner = head;
     for(i = 0; i < num_unique_characters + 1; i++) {
@@ -132,7 +162,7 @@ void parse_file(int fd) {
         pow_count = 0;
         for(j = 1; j < 5; j++) {
             for(k = 0; k < 8; k++) {
-                decimal += (((buff[j]>>k)&1) * pow(2, pow_count));
+                decimal += (((buff[j]>>k)&1) * calculate_multiplier(pow_count));
                 pow_count++;
             }
         }
@@ -147,14 +177,21 @@ void parse_file(int fd) {
         decimal = 0;
     }
 
-    body = malloc(400);
+    body = malloc(SIZE);
     body_length = 0;
-    size_read = read(fd, buff, SIZE);
-    for(i = 0; i < size_read; i++) {
-        unsigned char this_byte  = buff[i];
-        for(j = 7; j >= 0; j--) {
-            body[body_length] = (this_byte>>j)&1;
-            body_length++;
+    count = 0;
+    while((size_read = read(fd, buff, SIZE)) > 0) {
+        for(i = 0; i < size_read; i++) {
+            unsigned char this_byte  = buff[i];
+            for(j = 7; j >= 0; j--) {
+                if(count == SIZE) {
+                    body = realloc(body, sizeof(body) * 2);
+                    count = 0;
+                }
+                body[body_length] = (this_byte>>j)&1;
+                body_length++;
+                count++;
+            }
         }
     }
 }
@@ -162,16 +199,24 @@ void parse_file(int fd) {
 int main (int argc, char *argv[]) {
     int fd;
 
-    if(argc != 2) {
-        printf("Usage: ./hdecode [file]\n");
+    if(argc > 3 || argc < 2) {
+        printf("Usage: ./hdecode [ ( infile | - ) [ outfile ] ]\n");
         exit(1);
     }
 
-    fd = open(argv[1], O_RDONLY);
+    if(strcmp(argv[1], "-") == 0) {
+        fd = 1;
+    } else {
+        fd = open(argv[1], O_RDONLY);
+    }
+
+    if(argc == 3) {
+        out_file = argv[2];
+    } else {
+        out_fd = 1;
+    }
 
     parse_file(fd);
-    /*print_body();*/
-    /*print_list();*/
     construct_tree(head);
     traverse_tree();
     return(0);
