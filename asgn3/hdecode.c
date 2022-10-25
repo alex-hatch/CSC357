@@ -316,5 +316,6 @@ int main (int argc, char *argv[]) {
     free_tree_nodes();
     free_nodes();
     free(body);
+    close(fd);
     return(0);
 }
