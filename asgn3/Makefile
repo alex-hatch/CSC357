@@ -2,16 +2,19 @@ CC = gcc
 
 CFLAGS = -ansi -pedantic -Wall -Werror
 
-PROGRAM = hencode
+all: hdecode hencode
+
+hdecode: hdecode.o
+	$(CC) $(CFLAGS) -o hdecode hdecode.o
 
 hencode: hencode.o
-	$(CC) $(CFLAGS) -o $(PROGRAM) hencode.o
-
-all: hencode.o
-	$(CFLAGS) -o $(PROGRAM) hencode.o
+	$(CC) $(CFLAGS) -o hencode hencode.o
 
 hencode.o: hencode.c
 	$(CC) $(CFLAGS) -c hencode.c
 
-clean: hencode
+hdecode.o: hdecode.c
+	$(CC) $(CFLAGS) -c hdecode.c
+
+clean: hencode hdecode
 	rm -f *.o
