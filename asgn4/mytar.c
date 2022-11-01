@@ -39,6 +39,8 @@
 #define DEVMINOR_SIZE 8
 #define PREFIX_SIZE 155
 
+int f_flag, c_flag, t_flag, x_flag, v_flag, S_flag;
+
 uint32_t extract_special_int(const char *where, int len) {
     /* For interoperability with GNU tar. GNU seems to
     * set the high–order bit of the first byte, then
@@ -51,7 +53,7 @@ uint32_t extract_special_int(const char *where, int len) {
     */
     int32_t val = -1;
     if ((len >= sizeof(val)) && (where[0] & 0x80)) {
-        /* the top bit is set and we have space
+        /* the top bit is set, and we have space
         * extract the last four bytes */
         val = *(int32_t *) (where + len - sizeof(val));
         val = ntohl(val); /* convert to host byte order */
@@ -98,8 +100,6 @@ int create_archive() {
 
 int main(int argc, char **argv) {
     int option_index;
-    int f_flag, c_flag, t_flag, x_flag, v_flag, S_flag;
-    f_flag = c_flag = t_flag = x_flag = v_flag = S_flag = 0;
 
     if (argc == 1) {
         printf("Usage: mytar [ctxvS]f tarfile [ path [ ... ] ]\n");
@@ -109,32 +109,26 @@ int main(int argc, char **argv) {
         switch (option_index) {
             case 'f':
                 /* Specifies archive filename */
-                printf("case f\n");
                 f_flag = 1;
                 break;
             case 'c':
                 /* create an archive */
-                printf("case c\n");
                 c_flag = 1;
                 break;
             case 't':
                 /* Print the table of contents of an archive */
-                printf("case t\n");
                 t_flag = 1;
                 break;
             case 'x':
                 /* Extract the contents of an archive */
-                printf("case x\n");
                 x_flag = 1;
                 break;
             case 'v':
                 /* Increases verbosity */
-                printf("case v\n");
                 v_flag = 1;
                 break;
             case 'S':
                 /* Be strict about standards compliance */
-                printf("case S\n");
                 S_flag = 1;
                 break;
             default:
