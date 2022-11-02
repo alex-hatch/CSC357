@@ -39,6 +39,8 @@
 #define DEVMINOR_SIZE 8
 #define PREFIX_SIZE 155
 
+#define MALLOC_SIZE 500
+
 int f_flag, c_flag, t_flag, x_flag, v_flag, S_flag;
 
 uint32_t extract_special_int(const char *where, int len) {
@@ -99,48 +101,95 @@ int create_archive() {
 }
 
 int main(int argc, char **argv) {
-    int option_index;
+    char *tarfile;
+    char **paths = NULL;
+    int i;
+    int count;
+    int new_size;
+    int path_count;
 
     if (argc == 1) {
-        printf("Usage: mytar [ctxvS]f tarfile [ path [ ... ] ]\n");
+        fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
         exit(1);
     }
-    while ((option_index = getopt(argc, argv, "ctxvfS:")) != -1) {
-        switch (option_index) {
-            case 'f':
-                /* Specifies archive filename */
-                f_flag = 1;
-                break;
-            case 'c':
-                /* create an archive */
-                c_flag = 1;
-                break;
-            case 't':
-                /* Print the table of contents of an archive */
-                t_flag = 1;
-                break;
-            case 'x':
-                /* Extract the contents of an archive */
-                x_flag = 1;
-                break;
-            case 'v':
-                /* Increases verbosity */
-                v_flag = 1;
-                break;
-            case 'S':
-                /* Be strict about standards compliance */
-                S_flag = 1;
-                break;
-            default:
-                printf("Usage: mytar [ctxvS]f tarfile [ path [ ... ] ]\n");
-                exit(2);
+
+    /* create an archive */
+    if(strstr(argv[1], "c") != NULL) {
+        if(t_flag == 1 || x_flag == 1) {
+            fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+            exit(4);
         }
+        c_flag = 1;
+    }
+
+    /* Print the table of contents of an archive */
+    if(strstr(argv[1], "t") != NULL) {
+        if(c_flag == 1 || x_flag == 1) {
+            fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+            exit(5);
+        }
+        t_flag = 1;
+    }
+
+    /* Extract the contents of an archive */
+    if(strstr(argv[1], "x") != NULL) {
+        if(c_flag == 1 || t_flag == 1) {
+            fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+            exit(6);
+        }
+        x_flag = 1;
+    }
+
+    /* Increases verbosity */
+    if(strstr(argv[1], "v") != NULL) {
+        v_flag = 1;
+    }
+
+    /* Be strict about standards compliance */
+    if(strstr(argv[1], "S") != NULL) {
+        S_flag = 1;
+    }
+
+    /* Specifies archive filename */
+    if(strstr(argv[1], "f") != NULL) {
+        f_flag = 1;
     }
 
     /* f option is required */
     if (!f_flag) {
-        printf("Usage: mytar [ctxvS]f tarfile [ path [ ... ] ]\n");
+        fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
         exit(3);
     }
+
+
+    tarfile = argv[2];
+
+    printf("Tar file name: %s\n", tarfile);
+
+    paths = malloc(MALLOC_SIZE);
+    if(!paths) {
+        perror("malloc");
+        exit(7);
+    }
+    count = 0;
+    new_size = MALLOC_SIZE * 2;
+    path_count = 0;
+    for(i = 3; i < argc; i++) {
+        if(count == MALLOC_SIZE) {
+            paths = realloc(paths, new_size);
+            count = 0;
+            new_size += MALLOC_SIZE;
+        }
+        paths[i - 3] = argv[i];
+        count++;
+        path_count++;
+    }
+
+    for(i = 0; i < path_count; i++) {
+        printf("%s\n", paths[i]);
+    }
+
+    printf("c: %d, t: %d, x: %d, v: %d, S: %d, f: %d\n", c_flag, t_flag, x_flag, v_flag, S_flag, f_flag);
+    free(paths);
     return 0;
 }
