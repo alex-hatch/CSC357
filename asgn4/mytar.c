@@ -116,82 +116,82 @@ int extract_archive(char *tar_file) {
         exit(25);
     }
 
-    if (!(name = (char *) malloc(100))) {
+    if (!(name = (char *) malloc(NAME_SIZE))) {
         perror("malloc:");
         exit(9);
     }
 
-    if (!(mode = malloc(8))) {
+    if (!(mode = malloc(MODE_SIZE))) {
         perror("malloc:");
         exit(10);
     }
 
-    if (!(uid = malloc(8))) {
+    if (!(uid = malloc(UID_SIZE))) {
         perror("malloc:");
         exit(11);
     }
 
-    if (!(gid = malloc(8))) {
+    if (!(gid = malloc(GID_SIZE))) {
         perror("malloc:");
         exit(12);
     }
 
-    if (!(size = malloc(12))) {
+    if (!(size = malloc(SIZE_SIZE))) {
         perror("malloc:");
         exit(13);
     }
 
-    if (!(mtime = malloc(12))) {
+    if (!(mtime = malloc(MTIME_SIZE))) {
         perror("malloc:");
         exit(14);
     }
 
-    if (!(chksum = malloc(8))) {
+    if (!(chksum = malloc(CHKSUM_SIZE))) {
         perror("malloc:");
         exit(15);
     }
 
-    if (!(typeflag = malloc(1))) {
+    if (!(typeflag = malloc(TYPEFLAG_SIZE))) {
         perror("malloc:");
         exit(16);
     }
 
-    if (!(linkname = malloc(100))) {
+    if (!(linkname = malloc(LINKNAME_SIZE))) {
         perror("malloc:");
         exit(17);
     }
 
-    if (!(magic = malloc(6))) {
+    if (!(magic = malloc(MAGIC_SIZE))) {
         perror("malloc:");
         exit(18);
     }
 
-    if (!(version = malloc(2))) {
+    if (!(version = malloc(VERSION_SIZE))) {
         perror("malloc:");
         exit(19);
     }
 
-    if (!(uname = malloc(32))) {
+    if (!(uname = malloc(UNAME_SIZE))) {
         perror("malloc:");
         exit(20);
     }
 
-    if (!(gname = malloc(32))) {
+    if (!(gname = malloc(GNAME_SIZE))) {
         perror("malloc:");
         exit(21);
     }
 
-    if (!(devmajor = malloc(8))) {
+    if (!(devmajor = malloc(DEVMAJOR_SIZE))) {
         perror("malloc:");
         exit(22);
     }
 
-    if (!(devminor = malloc(8))) {
+    if (!(devminor = malloc(DEVMINOR_SIZE))) {
         perror("malloc:");
         exit(23);
     }
 
-    if (!(prefix = malloc(155))) {
+    if (!(prefix = malloc(PREFIX_SIZE))) {
         perror("malloc:");
         exit(24);
     }
@@ -201,26 +201,26 @@ int extract_archive(char *tar_file) {
         exit(25);
     }
 
-    if (read(fd, name, 100) == -1) {
+    if (read(fd, name, NAME_SIZE) == -1) {
         perror(name);
         exit(26);
     }
 
-    read(fd, mode, 8);
-    read(fd, uid, 8);
-    read(fd, gid, 8);
-    read(fd, size, 12);
-    read(fd, mtime, 12);
-    read(fd, chksum, 8);
-    read(fd, typeflag, 1);
-    read(fd, linkname, 100);
-    read(fd, magic, 6);
-    read(fd, version, 2);
-    read(fd, uname, 32);
-    read(fd, gname, 32);
-    read(fd, devmajor, 8);
-    read(fd, devminor, 8);
-    read(fd, prefix, 155);
+    read(fd, mode, MODE_SIZE);
+    read(fd, uid, UID_SIZE);
+    read(fd, gid, GID_SIZE);
+    read(fd, size, SIZE_SIZE);
+    read(fd, mtime, MTIME_SIZE);
+    read(fd, chksum, CHKSUM_SIZE);
+    read(fd, typeflag, TYPEFLAG_SIZE);
+    read(fd, linkname, LINKNAME_SIZE);
+    read(fd, magic, MAGIC_SIZE);
+    read(fd, version, VERSION_SIZE);
+    read(fd, uname, UNAME_SIZE);
+    read(fd, gname, GNAME_SIZE);
+    read(fd, devmajor, DEVMAJOR_SIZE);
+    read(fd, devminor, DEVMINOR_SIZE);
+    read(fd, prefix, PREFIX_SIZE);
 
     lseek(fd, 12, SEEK_CUR);
     read(fd, contents, atoi(size));
