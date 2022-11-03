@@ -88,7 +88,181 @@ int insert_special_int(char *where, size_t size, int32_t val) {
     return err;
 }
 
-int extract_archive() {
+int extract_archive(char *tar_file) {
+    int fd;
+    int new_fd;
+    char *name;
+    char *mode;
+    char *uid;
+    char *gid;
+    char *size;
+    char *mtime;
+    char *chksum;
+    char *typeflag;
+    char *linkname;
+    char *magic;
+    char *version;
+    char *uname;
+    char *gname;
+    char *devmajor;
+    char *devminor;
+    char *prefix;
+    char *contents;
+
+    fd = open(tar_file, O_RDONLY);
+
+    if (fd == -1) {
+        perror(tar_file);
+        exit(25);
+    }
+
+    if (!(name = (char *) malloc(100))) {
+        perror("malloc:");
+        exit(9);
+    }
+
+    if (!(mode = malloc(8))) {
+        perror("malloc:");
+        exit(10);
+    }
+
+    if (!(uid = malloc(8))) {
+        perror("malloc:");
+        exit(11);
+    }
+
+    if (!(gid = malloc(8))) {
+        perror("malloc:");
+        exit(12);
+    }
+
+    if (!(size = malloc(12))) {
+        perror("malloc:");
+        exit(13);
+    }
+
+    if (!(mtime = malloc(12))) {
+        perror("malloc:");
+        exit(14);
+    }
+
+    if (!(chksum = malloc(8))) {
+        perror("malloc:");
+        exit(15);
+    }
+
+    if (!(typeflag = malloc(1))) {
+        perror("malloc:");
+        exit(16);
+    }
+
+    if (!(linkname = malloc(100))) {
+        perror("malloc:");
+        exit(17);
+    }
+
+    if (!(magic = malloc(6))) {
+        perror("malloc:");
+        exit(18);
+    }
+
+    if (!(version = malloc(2))) {
+        perror("malloc:");
+        exit(19);
+    }
+
+    if (!(uname = malloc(32))) {
+        perror("malloc:");
+        exit(20);
+    }
+
+    if (!(gname = malloc(32))) {
+        perror("malloc:");
+        exit(21);
+    }
+
+    if (!(devmajor = malloc(8))) {
+        perror("malloc:");
+        exit(22);
+    }
+
+    if (!(devminor = malloc(8))) {
+        perror("malloc:");
+        exit(23);
+    }
+
+    if (!(prefix = malloc(155))) {
+        perror("malloc:");
+        exit(24);
+    }
+
+    if (!(contents = malloc(atoi(size)))) {
+        perror("malloc:");
+        exit(25);
+    }
+
+    if (read(fd, name, 100) == -1) {
+        perror(name);
+        exit(26);
+    }
+
+    read(fd, mode, 8);
+    read(fd, uid, 8);
+    read(fd, gid, 8);
+    read(fd, size, 12);
+    read(fd, mtime, 12);
+    read(fd, chksum, 8);
+    read(fd, typeflag, 1);
+    read(fd, linkname, 100);
+    read(fd, magic, 6);
+    read(fd, version, 2);
+    read(fd, uname, 32);
+    read(fd, gname, 32);
+    read(fd, devmajor, 8);
+    read(fd, devminor, 8);
+    read(fd, prefix, 155);
+
+    lseek(fd, 12, SEEK_CUR);
+    read(fd, contents, atoi(size));
+
+    printf("name: %s\n", name);
+    printf("mode: %s\n", mode);
+    printf("uid: %s\n", uid);
+    printf("gid: %s\n", gid);
+    printf("size: %s\n", size);
+    printf("mtime: %s\n", mtime);
+    printf("chksum: %s\n", chksum);
+    printf("typeflag: %s\n", typeflag);
+    printf("linkname: %s\n", linkname);
+    printf("magic: %s\n", magic);
+    printf("version: %s\n", version);
+    printf("uname: %s\n", uname);
+    printf("gname: %s\n", gname);
+    printf("devmajor: %s\n", devmajor);
+    printf("devminor: %s\n", devminor);
+    printf("prefix: %s\n", prefix);
+    printf("contents: %s\n", contents);
+
+    new_fd = open(name, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+    write(new_fd, contents, atoi(size));
+
+    free(name);
+    free(mode);
+    free(uid);
+    free(gid);
+    free(size);
+    free(mtime);
+    free(chksum);
+    free(typeflag);
+    free(linkname);
+    free(magic);
+    free(version);
+    free(uname);
+    free(gname);
+    free(devmajor);
+    free(devminor);
+    free(prefix);
+    free(contents);
     return 1;
 }
 
