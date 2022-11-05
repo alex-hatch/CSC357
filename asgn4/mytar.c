@@ -87,6 +87,7 @@ int insert_special_int(char *where, size_t size, int32_t val) {
     }
     return err;
 }
+
 int extract_archive(char *tar_file) {
     int fd;
     int new_fd;
@@ -108,14 +109,15 @@ int extract_archive(char *tar_file) {
     char *prefix;
     char *contents;
     int size_read;
-    int file_count;
+    int file_chunk_size;
+    int converted_mode;
 
     if ((fd = open(tar_file, O_RDONLY)) == -1) {
         perror(tar_file);
         exit(25);
     }
 
-    file_count = 0;
+    file_chunk_size = 0;
     while ((size_read = read(fd, NULL, 512)) != 0) {
         lseek(fd, -(size_read + 1), SEEK_CUR);
 
@@ -199,11 +201,6 @@ int extract_archive(char *tar_file) {
             exit(24);
         }
 
-        if (!(contents = malloc(atoi(size)))) {
-            perror("malloc:");
-            exit(25);
-        }
-
         if (read(fd, name, NAME_SIZE) == -1) {
             perror(name);
             exit(26);
@@ -226,10 +223,16 @@ int extract_archive(char *tar_file) {
         read(fd, prefix, PREFIX_SIZE);
 
         lseek(fd, 12, SEEK_CUR);
-        read(fd, contents, atoi(size));
+
+        if (!(contents = malloc((strtol(size, NULL, 8)) + 1))) {
+            perror("malloc:");
+            exit(25);
+        }
+        read(fd, contents, (strtol(size, NULL, 8) + 1));
 
         strcat(prefix, name);
 
+        /*
         printf("name: %s\n", prefix);
         printf("mode: %s\n", mode);
         printf("uid: %s\n", uid);
@@ -246,15 +249,37 @@ int extract_archive(char *tar_file) {
         printf("devmajor: %s\n", devmajor);
         printf("devminor: %s\n", devminor);
         printf("prefix: %s\n", prefix);
-        printf("contents: %s\n", contents);
+         */
+        /* printf("contents: %s\n", contents); */
 
-        new_fd = open(name, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
-        write(new_fd, contents, atoi(size));
-        close(new_fd);
-        printf("SEEKING\n");
+        /*change_directories(prefix);*/
 
-        file_count++;
-        lseek(fd, 1024 * file_count, SEEK_SET);
+        if (memcmp(typeflag, "0", 1) == 0 || memcmp(typeflag, "\0", 1) == 0) {
+            /* we have a regular file */
+            printf("Regular file!\n");
+
+            new_fd = open(name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+            write(new_fd, contents, (strtol(size, NULL, 8)));
+            free(contents);
+            close(new_fd);
+
+            file_chunk_size = (int) (strtol(size, NULL, 8) / 512) + 1;
+            /*
+            printf("TOTAL CHUNKS: %d\n", file_chunk_size);
+            printf("Moving back: %d\n", (int) (strtol(size, NULL, 8)));
+             */
+            lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
+            lseek(fd, (512 * file_chunk_size), SEEK_CUR);
+        } else if (memcmp(typeflag, "5", 1) == 0) {
+            printf("Directory!\n");
+            mkdir(prefix, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+            lseek(fd, -1, SEEK_CUR);
+        } else if (memcmp(typeflag, "2", 1) == 0) {
+            /* symbolic link */
+            printf("Symbolic link!\n");
+        } else {
+            fprintf(stderr, "Unsupported file type supplied\n");
+        }
 
         free(name);
         free(mode);
@@ -271,8 +296,6 @@ int extract_archive(char *tar_file) {
         free(gname);
         free(devmajor);
         free(devminor);
-        free(prefix);
-        free(contents);
     }
     return 1;
 }
