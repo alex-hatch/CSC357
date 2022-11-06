@@ -378,6 +378,7 @@ int main(int argc, char **argv) {
     int new_size;
     int path_count;
     int i;
+    int supplied_path;
 
     if (argc == 1) {
         fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
@@ -439,8 +440,6 @@ int main(int argc, char **argv) {
 
     tarfile = argv[2];
 
-    printf("Tar file name: %s\n", tarfile);
-
     paths = malloc(MALLOC_SIZE);
     if (!paths) {
         perror("malloc");
@@ -460,15 +459,19 @@ int main(int argc, char **argv) {
         path_count++;
     }
 
+    if(path_count > 0) {
+        supplied_path = 1;
+    }
 
+
+    /*
     for (i = 0; i < path_count; i++) {
         printf("%s\n", paths[i]);
     }
-
-    printf("c: %d, t: %d, x: %d, v: %d, S: %d, f: %d\n", c_flag, t_flag, x_flag, v_flag, S_flag, f_flag);
+     */
 
     if (x_flag == 1) {
-        extract_archive(tarfile);
+        extract_archive(tarfile, paths, supplied_path, path_count);
     }
 
     free(paths);
