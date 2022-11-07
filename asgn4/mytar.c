@@ -388,7 +388,8 @@ int main(int argc, char **argv) {
     /* create an archive */
     if (strstr(argv[1], "c") != NULL) {
         if (t_flag == 1 || x_flag == 1) {
-            fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+            fprintf(stderr,
+                    "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
             exit(4);
         }
         c_flag = 1;
@@ -397,7 +398,8 @@ int main(int argc, char **argv) {
     /* Print the table of contents of an archive */
     if (strstr(argv[1], "t") != NULL) {
         if (c_flag == 1 || x_flag == 1) {
-            fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+            fprintf(stderr,
+                    "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
             exit(5);
         }
         t_flag = 1;
@@ -406,7 +408,8 @@ int main(int argc, char **argv) {
     /* Extract the contents of an archive */
     if (strstr(argv[1], "x") != NULL) {
         if (c_flag == 1 || t_flag == 1) {
-            fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+            fprintf(stderr,
+                    "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
             exit(6);
         }
         x_flag = 1;
@@ -429,12 +432,14 @@ int main(int argc, char **argv) {
 
     /* f option is required */
     if (!f_flag) {
-        fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+        fprintf(stderr,
+                "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
         exit(3);
     }
 
     if (argc < 3) {
-        fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
+        fprintf(stderr,
+                "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
         exit(8);
     }
 
