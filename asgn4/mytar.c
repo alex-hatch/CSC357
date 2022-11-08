@@ -262,54 +262,64 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
         if(supplied_path) {
             match = 0;
             for(j = 0; j < path_count; j++) {
-                printf("paths[j]: %s, prefix: %s\n", paths[j], prefix);
                 if(strncmp(prefix, paths[j], strlen(paths[j])) == 0) {
                     match = 1;
-                    printf("RAN\n");
-                    if (memcmp(typeflag, "0", 1) == 0 || memcmp(typeflag, "\0", 1) == 0) {
+                    if (memcmp(typeflag, "0", 1) == 0
+                    || memcmp(typeflag, "\0", 1) == 0) {
                         /* we have a regular file */
                         converted_mode = (int) strtol(mode, NULL, 8);
-                        if(((S_IXUSR | S_IXGRP | S_IXOTH) & converted_mode) != 0) {
-                            new_fd = open(name, O_WRONLY | O_CREAT, S_IRWXU, S_IRWXG, S_IRWXO);
+                        if(((S_IXUSR | S_IXGRP | S_IXOTH)
+                        & converted_mode) != 0) {
+                            new_fd = open(name, O_WRONLY | O_CREAT
+                                          , S_IRWXU, S_IRWXG, S_IRWXO);
                         } else {
-                            new_fd = open(name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+                            new_fd = open(name, O_WRONLY | O_CREAT,
+                                          S_IRUSR | S_IWUSR
+                                          | S_IRGRP | S_IWGRP
+                                          | S_IROTH | S_IWOTH);
                         }
                         write(new_fd, contents, (strtol(size, NULL, 8)));
                         free(contents);
                         close(new_fd);
 
-                        file_chunk_size = (int) (strtol(size, NULL, 8) / 512) + 1;
-                        /*
-                        printf("TOTAL CHUNKS: %d\n", file_chunk_size);
-                        printf("Moving back: %d\n", (int) (strtol(size, NULL, 8)));
-                         */
+                        file_chunk_size = (int)
+                                (strtol(size, NULL, 8) / 512) + 1;
                         lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
                         lseek(fd, (512 * file_chunk_size), SEEK_CUR);
                     } else if (memcmp(typeflag, "5", 1) == 0) {
-                        mkdir(prefix, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+                        mkdir(prefix,
+                              S_IRUSR | S_IWUSR | S_IXUSR
+                              | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
                         lseek(fd, -1, SEEK_CUR);
                     } else if (memcmp(typeflag, "2", 1) == 0) {
                         /* symbolic link */
+                        if(symlink(linkname, prefix) == -1) {
+                            perror("symlink");
+                            exit(40);
+                        }
+                        lseek(fd, -1, SEEK_CUR);
                     } else {
                         fprintf(stderr, "Unsupported file type supplied\n");
+                    }
+                    if(v_flag) {
+                        printf("%s\n", prefix);
                     }
                 }
             }
             if(!match) {
-                if (memcmp(typeflag, "0", 1) == 0 || memcmp(typeflag, "\0", 1) == 0) {
+                if (memcmp(typeflag, "0", 1) == 0
+                || memcmp(typeflag, "\0", 1) == 0) {
                     /* we have a regular file */
                     file_chunk_size = (int) (strtol(size, NULL, 8) / 512) + 1;
-                    /*
-                    printf("TOTAL CHUNKS: %d\n", file_chunk_size);
-                    printf("Moving back: %d\n", (int) (strtol(size, NULL, 8)));
-                     */
                     lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
                     lseek(fd, (512 * file_chunk_size), SEEK_CUR);
                 } else if (memcmp(typeflag, "5", 1) == 0) {
                     lseek(fd, -1, SEEK_CUR);
                 } else if (memcmp(typeflag, "2", 1) == 0) {
                     /* symbolic link */
+                    lseek(fd, -1, SEEK_CUR);
                 }
+                free(contents);
             }
         } else {
             if (memcmp(typeflag, "0", 1) == 0 || memcmp(typeflag, "\0", 1) == 0) {
