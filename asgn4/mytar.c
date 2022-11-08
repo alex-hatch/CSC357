@@ -88,7 +88,8 @@ int insert_special_int(char *where, size_t size, int32_t val) {
     return err;
 }
 
-int extract_archive(char *tar_file, char **paths, int supplied_path, int path_count) {
+int extract_archive(char *tar_file, char **paths,
+                    int supplied_path, int path_count) {
     int fd;
     int new_fd;
     char *name;
@@ -114,10 +115,7 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
     int i;
     int j;
     int match;
-
-    for(i = 0; i < 2; i++) {
-        printf("path: %s\n", paths[i]);
-    }
+    int our_sum;
 
     if ((fd = open(tar_file, O_RDONLY)) == -1) {
         perror(tar_file);
@@ -213,21 +211,150 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
             exit(26);
         }
 
-        read(fd, mode, MODE_SIZE);
-        read(fd, uid, UID_SIZE);
-        read(fd, gid, GID_SIZE);
-        read(fd, size, SIZE_SIZE);
-        read(fd, mtime, MTIME_SIZE);
-        read(fd, chksum, CHKSUM_SIZE);
-        read(fd, typeflag, TYPEFLAG_SIZE);
-        read(fd, linkname, LINKNAME_SIZE);
-        read(fd, magic, MAGIC_SIZE);
-        read(fd, version, VERSION_SIZE);
-        read(fd, uname, UNAME_SIZE);
-        read(fd, gname, GNAME_SIZE);
-        read(fd, devmajor, DEVMAJOR_SIZE);
-        read(fd, devminor, DEVMINOR_SIZE);
-        read(fd, prefix, PREFIX_SIZE);
+        our_sum = 0;
+
+        for (i = 0; i < NAME_SIZE; i++) {
+            our_sum += (unsigned char) name[i];
+        }
+
+        if (read(fd, mode, MODE_SIZE) == -1) {
+            perror(mode);
+            exit(130);
+        }
+        for (i = 0; i < MODE_SIZE; i++) {
+            our_sum += (unsigned char) mode[i];
+        }
+
+        if (read(fd, uid, UID_SIZE) == -1) {
+            perror(uid);
+            exit(131);
+        }
+        for (i = 0; i < UID_SIZE; i++) {
+            our_sum += (unsigned char) uid[i];
+        }
+
+        if (read(fd, gid, GID_SIZE) == -1) {
+            perror(gid);
+            exit(132);
+        }
+        for (i = 0; i < GID_SIZE; i++) {
+            our_sum += (unsigned char) gid[i];
+        }
+
+        if (read(fd, size, SIZE_SIZE) == -1) {
+            perror(size);
+            exit(133);
+        }
+        for (i = 0; i < SIZE_SIZE; i++) {
+            our_sum += (unsigned char) size[i];
+        }
+
+        if (read(fd, mtime, MTIME_SIZE) == -1) {
+            perror(mtime);
+            exit(134);
+        }
+        for (i = 0; i < MTIME_SIZE; i++) {
+            our_sum += (unsigned char) mtime[i];
+        }
+
+        if (read(fd, chksum, CHKSUM_SIZE) == -1) {
+            perror(mtime);
+            exit(135);
+        }
+        for (i = 0; i < CHKSUM_SIZE; i++) {
+            our_sum += 32;
+        }
+
+        if (read(fd, typeflag, TYPEFLAG_SIZE) == -1) {
+            perror(typeflag);
+            exit(136);
+        }
+        for (i = 0; i < TYPEFLAG_SIZE; i++) {
+            our_sum += (unsigned char) typeflag[i];
+        }
+
+        if (read(fd, linkname, LINKNAME_SIZE) == -1) {
+            perror(linkname);
+            exit(137);
+        }
+        for (i = 0; i < LINKNAME_SIZE; i++) {
+            our_sum += (unsigned char) linkname[i];
+        }
+
+        if (read(fd, magic, MAGIC_SIZE) == -1) {
+            perror(magic);
+            exit(138);
+        }
+        for (i = 0; i < MAGIC_SIZE; i++) {
+            our_sum += (unsigned char) magic[i];
+        }
+
+        if (read(fd, version, VERSION_SIZE) == -1) {
+            perror(version);
+            exit(139);
+        }
+        for (i = 0; i < VERSION_SIZE; i++) {
+            our_sum += (unsigned char) version[i];
+        }
+
+        if (read(fd, uname, UNAME_SIZE) == -1) {
+            perror(uname);
+            exit(140);
+        }
+        for (i = 0; i < UNAME_SIZE; i++) {
+            our_sum += (unsigned char) uname[i];
+        }
+
+        if (read(fd, gname, GNAME_SIZE) == -1) {
+            perror(gname);
+            exit(141);
+        }
+        for (i = 0; i < GNAME_SIZE; i++) {
+            our_sum += (unsigned char) gname[i];
+        }
+
+        if (read(fd, devmajor, DEVMAJOR_SIZE) == -1) {
+            perror(devmajor);
+            exit(142);
+        }
+        for (i = 0; i < DEVMAJOR_SIZE; i++) {
+            our_sum += (unsigned char) devmajor[i];
+        }
+
+        if (read(fd, devminor, DEVMINOR_SIZE) == -1) {
+            perror(devminor);
+            exit(143);
+        }
+        for (i = 0; i < DEVMINOR_SIZE; i++) {
+            our_sum += (unsigned char) devminor[i];
+        }
+
+        if (read(fd, prefix, PREFIX_SIZE) == -1) {
+            perror(prefix);
+            exit(144);
+        }
+        for (i = 0; i < PREFIX_SIZE; i++) {
+            our_sum += (unsigned char) prefix[i];
+        }
+
+        if ((our_sum) != strtol(chksum, NULL, 8)) {
+            free(name);
+            free(mode);
+            free(uid);
+            free(gid);
+            free(size);
+            free(mtime);
+            free(chksum);
+            free(typeflag);
+            free(linkname);
+            free(magic);
+            free(version);
+            free(uname);
+            free(gname);
+            free(devmajor);
+            free(devminor);
+            exit(150);
+        }
 
         lseek(fd, 12, SEEK_CUR);
 
@@ -235,9 +362,29 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
             perror("malloc:");
             exit(25);
         }
-        read(fd, contents, (strtol(size, NULL, 8) + 1));
+
+        if (read(fd, contents, (strtol(size, NULL, 8) + 1)) == -1) {
+            perror(contents);
+            exit(145);
+        }
 
         strcat(prefix, name);
+
+        if (S_flag) {
+            if (memcmp(magic, "ustar\0", 6) != 0) {
+                fprintf(stderr, "incorrect magic\n");
+                exit(100);
+            }
+            if (memcmp(version, "00", 2) != 0) {
+                fprintf(stderr, "incorrect version\n");
+                exit(101);
+            }
+        } else {
+            if (memcmp(magic, "ustar", 5) != 0) {
+                fprintf(stderr, "incorrect magic\n");
+                exit(102);
+            }
+        }
 
         /*
         printf("name: %s\n", prefix);
@@ -265,13 +412,13 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
                 if(strncmp(prefix, paths[j], strlen(paths[j])) == 0) {
                     match = 1;
                     if (memcmp(typeflag, "0", 1) == 0
-                    || memcmp(typeflag, "\0", 1) == 0) {
+                        || memcmp(typeflag, "\0", 1) == 0) {
                         /* we have a regular file */
                         converted_mode = (int) strtol(mode, NULL, 8);
                         if(((S_IXUSR | S_IXGRP | S_IXOTH)
-                        & converted_mode) != 0) {
+                            & converted_mode) != 0) {
                             new_fd = open(name, O_WRONLY | O_CREAT
-                                          , S_IRWXU, S_IRWXG, S_IRWXO);
+                                    , S_IRWXU, S_IRWXG, S_IRWXO);
                         } else {
                             new_fd = open(name, O_WRONLY | O_CREAT,
                                           S_IRUSR | S_IWUSR
@@ -308,7 +455,7 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
             }
             if(!match) {
                 if (memcmp(typeflag, "0", 1) == 0
-                || memcmp(typeflag, "\0", 1) == 0) {
+                    || memcmp(typeflag, "\0", 1) == 0) {
                     /* we have a regular file */
                     file_chunk_size = (int) (strtol(size, NULL, 8) / 512) + 1;
                     lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
@@ -322,18 +469,22 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
                 free(contents);
             }
         } else {
-            if (memcmp(typeflag, "0", 1) == 0 || memcmp(typeflag, "\0", 1) == 0) {
+            if (memcmp(typeflag, "0", 1) == 0
+                || memcmp(typeflag, "\0", 1) == 0) {
                 /* we have a regular file */
                 converted_mode = (int) strtol(mode, NULL, 8);
-                if(((S_IXUSR | S_IXGRP | S_IXOTH) & converted_mode) != 0) {
-                    new_fd = open(name, O_WRONLY | O_CREAT, S_IRWXU, S_IRWXG, S_IRWXO);
+                if (((S_IXUSR | S_IXGRP | S_IXOTH) & converted_mode) != 0) {
+                    new_fd = open(prefix, O_WRONLY | O_CREAT,
+                                  S_IRWXU, S_IRWXG, S_IRWXO);
                 } else {
-                    new_fd = open(name, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+                    new_fd = open(prefix,
+                                  O_WRONLY | O_CREAT,
+                                  S_IRUSR | S_IWUSR | S_IRGRP
+                                  | S_IWGRP | S_IROTH | S_IWOTH);
                 }
                 write(new_fd, contents, (strtol(size, NULL, 8)));
                 free(contents);
                 close(new_fd);
-
                 file_chunk_size = (int) (strtol(size, NULL, 8) / 512) + 1;
                 /*
                 printf("TOTAL CHUNKS: %d\n", file_chunk_size);
@@ -342,18 +493,24 @@ int extract_archive(char *tar_file, char **paths, int supplied_path, int path_co
                 lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
                 lseek(fd, (512 * file_chunk_size), SEEK_CUR);
             } else if (memcmp(typeflag, "5", 1) == 0) {
-                mkdir(prefix, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+                mkdir(prefix, S_IRUSR | S_IWUSR
+                              | S_IXUSR |
+                              S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
                 lseek(fd, -1, SEEK_CUR);
             } else if (memcmp(typeflag, "2", 1) == 0) {
                 /* symbolic link */
+                if (symlink(linkname, prefix) == -1) {
+                    perror("symlink");
+                    exit(40);
+                }
+                lseek(fd, -1, SEEK_CUR);
             } else {
                 fprintf(stderr, "Unsupported file type supplied\n");
             }
+            if (v_flag) {
+                printf("%s\n", prefix);
+            }
         }
-        if(v_flag) {
-            printf("%s\n", prefix);
-        }
-
         free(name);
         free(mode);
         free(uid);
@@ -389,6 +546,9 @@ int main(int argc, char **argv) {
     int path_count;
     int i;
     int supplied_path;
+    char **paths_copy;
+    char *path_substring;
+    char *new_path_piece;
 
     if (argc == 1) {
         fprintf(stderr, "Usage: mytar [ctx][v][S]f tarfile [ path [ ... ] ]\n");
@@ -474,19 +634,36 @@ int main(int argc, char **argv) {
         path_count++;
     }
 
-    if(path_count > 0) {
+    paths_copy = malloc(path_count);
+    for(i = 0; i < path_count; i++) {
+        paths_copy[i] = strdup(paths[i]);
+    }
+
+    if (path_count > 0) {
         supplied_path = 1;
+        for(i = 0; i < path_count; i++) {
+            path_substring = strtok(paths[i], "/");
+            if(strcmp(path_substring, paths_copy[i]) == 0)
+                continue;
+            printf("HeRE: %s\n", path_substring);
+            mkdir(path_substring, S_IRUSR | S_IWUSR
+                          | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+            while((new_path_piece = strtok(NULL, "/")) != NULL) {
+                strcat(path_substring, "/\0");
+                strcat(path_substring, new_path_piece);
+            }
+        }
     }
 
 
     /*
     for (i = 0; i < path_count; i++) {
-        printf("%s\n", paths[i]);
+        printf("%s\n", paths_copy[i]);
     }
      */
 
     if (x_flag == 1) {
-        extract_archive(tarfile, paths, supplied_path, path_count);
+        extract_archive(tarfile, paths_copy, supplied_path, path_count);
     }
 
     free(paths);
