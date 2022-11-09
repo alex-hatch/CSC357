@@ -409,7 +409,9 @@ int extract_archive(char *tar_file, char **paths,
         if(supplied_path) {
             match = 0;
             for(j = 0; j < path_count; j++) {
-                if(strncmp(prefix, paths[j], strlen(paths[j])) == 0) {
+                if(strncmp(prefix, paths[j], strlen(paths[j])) == 0
+                && (prefix[strlen(paths[j])] == '\0'
+                || prefix[strlen(paths[j])] == '/')) {
                     match = 1;
                     if (memcmp(typeflag, "0", 1) == 0
                         || memcmp(typeflag, "\0", 1) == 0) {
