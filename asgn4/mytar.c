@@ -88,6 +88,7 @@ int insert_special_int(char *where, size_t size, int32_t val) {
     return err;
 }
 
+/* extract files from the archive */
 int extract_archive(char *tar_file, char **paths,
                     int supplied_path, int path_count) {
     int fd;
@@ -117,13 +118,16 @@ int extract_archive(char *tar_file, char **paths,
     int match;
     int our_sum;
 
+    /* open the tar file for reading */
     if ((fd = open(tar_file, O_RDONLY)) == -1) {
         perror(tar_file);
         exit(25);
     }
 
+    /* save the file chunk size */
     file_chunk_size = 0;
     while ((size_read = read(fd, NULL, 512)) != 0) {
+        /*  reset fd back to beginning of block */
         lseek(fd, -(size_read + 1), SEEK_CUR);
 
         if (!(name = (char *) malloc(NAME_SIZE))) {
@@ -213,6 +217,8 @@ int extract_archive(char *tar_file, char **paths,
 
         our_sum = 0;
 
+        /* split the block into appropriate fields with
+         * increment our_sum to verify with chksum */
         for (i = 0; i < NAME_SIZE; i++) {
             our_sum += (unsigned char) name[i];
         }
@@ -337,6 +343,7 @@ int extract_archive(char *tar_file, char **paths,
             our_sum += (unsigned char) prefix[i];
         }
 
+        /* chksun failed: abort */
         if ((our_sum) != strtol(chksum, NULL, 8)) {
             free(name);
             free(mode);
@@ -356,6 +363,7 @@ int extract_archive(char *tar_file, char **paths,
             exit(150);
         }
 
+        /* go to the next block */
         lseek(fd, 12, SEEK_CUR);
 
         if (!(contents = malloc((strtol(size, NULL, 8)) + 1))) {
@@ -363,52 +371,45 @@ int extract_archive(char *tar_file, char **paths,
             exit(25);
         }
 
+        /* read the contents of the file */
         if (read(fd, contents, (strtol(size, NULL, 8) + 1)) == -1) {
             perror(contents);
             exit(145);
         }
 
+
+        /* concat prefix and name */
+        if(strlen(prefix) != 0) {
+            prefix[strlen(prefix)] = '/';
+        }
         strcat(prefix, name);
 
         if (S_flag) {
-            if (memcmp(magic, "ustar\0", 6) != 0) {
+            /* if strict mode, ensure magic null terminated
+             * and version is 00
+             */
+            if (memcmp(magic, "ustar\0", MAGIC_SIZE) != 0) {
                 fprintf(stderr, "incorrect magic\n");
                 exit(100);
             }
-            if (memcmp(version, "00", 2) != 0) {
+            if (memcmp(version, "00", VERSION_SIZE) != 0) {
                 fprintf(stderr, "incorrect version\n");
                 exit(101);
             }
         } else {
-            if (memcmp(magic, "ustar", 5) != 0) {
+            /* if non-strict, check for ustar */
+            if (memcmp(magic, "ustar", MAGIC_SIZE - 1) != 0) {
                 fprintf(stderr, "incorrect magic\n");
                 exit(102);
             }
         }
 
-        /*
-        printf("name: %s\n", prefix);
-        printf("mode: %s\n", mode);
-        printf("uid: %s\n", uid);
-        printf("gid: %s\n", gid);
-        printf("size: %s\n", size);
-        printf("mtime: %s\n", mtime);
-        printf("chksum: %s\n", chksum);
-        printf("typeflag: %s\n", typeflag);
-        printf("linkname: %s\n", linkname);
-        printf("magic: %s\n", magic);
-        printf("version: %s\n", version);
-        printf("uname: %s\n", uname);
-        printf("gname: %s\n", gname);
-        printf("devmajor: %s\n", devmajor);
-        printf("devminor: %s\n", devminor);
-        printf("prefix: %s\n", prefix);
-         */
-        /* printf("contents: %s\n", contents); */
-
+        /* check if a specific path was supplied on the command line */
         if(supplied_path) {
             match = 0;
             for(j = 0; j < path_count; j++) {
+                /* check to see if the
+                 * header file name is a prefix of our target */
                 if(strncmp(prefix, paths[j], strlen(paths[j])) == 0
                 && (prefix[strlen(paths[j])] == '\0'
                 || prefix[strlen(paths[j])] == '/')) {
@@ -419,6 +420,7 @@ int extract_archive(char *tar_file, char **paths,
                         converted_mode = (int) strtol(mode, NULL, 8);
                         if(((S_IXUSR | S_IXGRP | S_IXOTH)
                             & converted_mode) != 0) {
+                            /* offer execute perms to everybody */
                             new_fd = open(name, O_WRONLY | O_CREAT
                                     , S_IRWXU, S_IRWXG, S_IRWXO);
                         } else {
@@ -427,15 +429,21 @@ int extract_archive(char *tar_file, char **paths,
                                           | S_IRGRP | S_IWGRP
                                           | S_IROTH | S_IWOTH);
                         }
+                        /* write the contents of the file
+                         * to the newly created file */
                         write(new_fd, contents, (strtol(size, NULL, 8)));
                         free(contents);
                         close(new_fd);
 
+                        /* calculate how far back to lseek */
                         file_chunk_size = (int)
                                 (strtol(size, NULL, 8) / 512) + 1;
                         lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
+
+                        /* lseek to next header */
                         lseek(fd, (512 * file_chunk_size), SEEK_CUR);
                     } else if (memcmp(typeflag, "5", 1) == 0) {
+                        /* we've found a directory */
                         mkdir(prefix,
                               S_IRUSR | S_IWUSR | S_IXUSR
                               | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
@@ -450,12 +458,17 @@ int extract_archive(char *tar_file, char **paths,
                     } else {
                         fprintf(stderr, "Unsupported file type supplied\n");
                     }
+                    /* verbose */
                     if(v_flag) {
                         printf("%s\n", prefix);
                     }
                 }
             }
+            /* this chunk of the tape was not
+             * targeted by the command line input
+             */
             if(!match) {
+                /* skip past this */
                 if (memcmp(typeflag, "0", 1) == 0
                     || memcmp(typeflag, "\0", 1) == 0) {
                     /* we have a regular file */
@@ -471,14 +484,19 @@ int extract_archive(char *tar_file, char **paths,
                 free(contents);
             }
         } else {
-            if (memcmp(typeflag, "0", 1) == 0
-                || memcmp(typeflag, "\0", 1) == 0) {
+            /* no targets were supplied on the command line
+             * extract all files
+             */
+            if (memcmp(typeflag, "0", TYPEFLAG_SIZE) == 0
+                || memcmp(typeflag, "\0", TYPEFLAG_SIZE) == 0) {
                 /* we have a regular file */
                 converted_mode = (int) strtol(mode, NULL, 8);
                 if (((S_IXUSR | S_IXGRP | S_IXOTH) & converted_mode) != 0) {
+                    /* offer execute permissions to everybody */
                     new_fd = open(prefix, O_WRONLY | O_CREAT,
                                   S_IRWXU, S_IRWXG, S_IRWXO);
                 } else {
+                    /* nobody had execute permissions */
                     new_fd = open(prefix,
                                   O_WRONLY | O_CREAT,
                                   S_IRUSR | S_IWUSR | S_IRGRP
@@ -487,19 +505,18 @@ int extract_archive(char *tar_file, char **paths,
                 write(new_fd, contents, (strtol(size, NULL, 8)));
                 free(contents);
                 close(new_fd);
+                /* calculate how many 512 block chunks this file occupied */
                 file_chunk_size = (int) (strtol(size, NULL, 8) / 512) + 1;
-                /*
-                printf("TOTAL CHUNKS: %d\n", file_chunk_size);
-                printf("Moving back: %d\n", (int) (strtol(size, NULL, 8)));
-                 */
+
+                /* find the next file header */
                 lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
                 lseek(fd, (512 * file_chunk_size), SEEK_CUR);
-            } else if (memcmp(typeflag, "5", 1) == 0) {
+            } else if (memcmp(typeflag, "5", TYPEFLAG_SIZE) == 0) {
                 mkdir(prefix, S_IRUSR | S_IWUSR
                               | S_IXUSR |
                               S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
                 lseek(fd, -1, SEEK_CUR);
-            } else if (memcmp(typeflag, "2", 1) == 0) {
+            } else if (memcmp(typeflag, "2", TYPEFLAG_SIZE) == 0) {
                 /* symbolic link */
                 if (symlink(linkname, prefix) == -1) {
                     perror("symlink");
@@ -509,6 +526,7 @@ int extract_archive(char *tar_file, char **paths,
             } else {
                 fprintf(stderr, "Unsupported file type supplied\n");
             }
+            /* verbose list files as extracted */
             if (v_flag) {
                 printf("%s\n", prefix);
             }
