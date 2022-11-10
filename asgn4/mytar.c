@@ -379,7 +379,7 @@ int extract_archive(char *tar_file, char **paths,
 
 
         /* concat prefix and name */
-        if(strlen(prefix) != 0) {
+        if (strlen(prefix) != 0) {
             prefix[strlen(prefix)] = '/';
         }
         strcat(prefix, name);
@@ -405,24 +405,24 @@ int extract_archive(char *tar_file, char **paths,
         }
 
         /* check if a specific path was supplied on the command line */
-        if(supplied_path) {
+        if (supplied_path) {
             match = 0;
-            for(j = 0; j < path_count; j++) {
+            for (j = 0; j < path_count; j++) {
                 /* check to see if the
                  * header file name is a prefix of our target */
-                if(strncmp(prefix, paths[j], strlen(paths[j])) == 0
-                && (prefix[strlen(paths[j])] == '\0'
-                || prefix[strlen(paths[j])] == '/')) {
+                if (strncmp(prefix, paths[j], strlen(paths[j])) == 0
+                    && (prefix[strlen(paths[j])] == '\0'
+                        || prefix[strlen(paths[j])] == '/')) {
                     match = 1;
                     if (memcmp(typeflag, "0", 1) == 0
                         || memcmp(typeflag, "\0", 1) == 0) {
                         /* we have a regular file */
                         converted_mode = (int) strtol(mode, NULL, 8);
-                        if(((S_IXUSR | S_IXGRP | S_IXOTH)
-                            & converted_mode) != 0) {
+                        if (((S_IXUSR | S_IXGRP | S_IXOTH)
+                             & converted_mode) != 0) {
                             /* offer execute perms to everybody */
-                            new_fd = open(name, O_WRONLY | O_CREAT
-                                    , S_IRWXU, S_IRWXG, S_IRWXO);
+                            new_fd = open(name, O_WRONLY | O_CREAT,
+                                          S_IRWXU, S_IRWXG, S_IRWXO);
                         } else {
                             new_fd = open(name, O_WRONLY | O_CREAT,
                                           S_IRUSR | S_IWUSR
@@ -438,7 +438,8 @@ int extract_archive(char *tar_file, char **paths,
                         /* calculate how far back to lseek */
                         file_chunk_size = (int)
                                 (strtol(size, NULL, 8) / 512) + 1;
-                        lseek(fd, -(strtol(size, NULL, 8) + 1), SEEK_CUR);
+                        lseek(fd, -(strtol(size,
+                                           NULL, 8) + 1), SEEK_CUR);
 
                         /* lseek to next header */
                         lseek(fd, (512 * file_chunk_size), SEEK_CUR);
@@ -450,7 +451,7 @@ int extract_archive(char *tar_file, char **paths,
                         lseek(fd, -1, SEEK_CUR);
                     } else if (memcmp(typeflag, "2", 1) == 0) {
                         /* symbolic link */
-                        if(symlink(linkname, prefix) == -1) {
+                        if (symlink(linkname, prefix) == -1) {
                             perror("symlink");
                             exit(40);
                         }
@@ -459,7 +460,7 @@ int extract_archive(char *tar_file, char **paths,
                         fprintf(stderr, "Unsupported file type supplied\n");
                     }
                     /* verbose */
-                    if(v_flag) {
+                    if (v_flag) {
                         printf("%s\n", prefix);
                     }
                 }
@@ -467,7 +468,7 @@ int extract_archive(char *tar_file, char **paths,
             /* this chunk of the tape was not
              * targeted by the command line input
              */
-            if(!match) {
+            if (!match) {
                 /* skip past this */
                 if (memcmp(typeflag, "0", 1) == 0
                     || memcmp(typeflag, "\0", 1) == 0) {
