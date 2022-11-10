@@ -662,12 +662,13 @@ int main(int argc, char **argv) {
     if (path_count > 0) {
         supplied_path = 1;
         for(i = 0; i < path_count; i++) {
-            path_substring = strtok(paths[i], "/");
+            path_substring = strtok(paths_copy[i], "/");
             if(strcmp(path_substring, paths_copy[i]) == 0)
                 continue;
-            printf("HeRE: %s\n", path_substring);
+            printf("HERE: %s\n", path_substring);
             mkdir(path_substring, S_IRUSR | S_IWUSR
-                          | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+                                  | S_IXUSR | S_IRGRP
+                                  | S_IWGRP | S_IROTH | S_IWOTH);
             while((new_path_piece = strtok(NULL, "/")) != NULL) {
                 strcat(path_substring, "/\0");
                 strcat(path_substring, new_path_piece);
