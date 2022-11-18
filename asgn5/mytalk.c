@@ -16,14 +16,18 @@
 #include <signal.h>
 
 #define BACKLOG 1
-#define MSG_SIZE 50
+#define MSG_SIZE 1000
+#define TIMEOUT 100
 
 int vflag, aflag, nflag;
 int fd;
 int accept_fd;
 
+/* close client when SIGINT received */
 void client_close() {
-    char *msg = "\nConnection closed connection: ^C to terminate\n";
+    char *msg = "\nConnection closed. ^C to terminate\n";
+    
+    /* Notify server of exit */
     if ((send(fd, msg, strlen(msg), 0)) == -1) {
         perror("send");
         exit(205);
@@ -34,8 +38,11 @@ void client_close() {
     exit(0);
 }
 
+/* close server when SIGINT received */
 void server_close() {
-    char *msg = "\nConnection closed connection: ^C to terminate\n";
+    char *msg = "\nConnection closed. ^C to terminate\n";
+    
+    /* Notify client of exit */
     if ((send(accept_fd, msg, strlen(msg), 0)) == -1) {
         perror("send");
         exit(205);
@@ -48,15 +55,14 @@ void server_close() {
 
 unsigned short convert_port(char *port) {
     int port_int;
-
     port_int = (int) strtol(port, NULL, 10);
     return htons(port_int);
 }
 
-int message_length(char* str) {
+int message_length(char *str) {
     int count;
     count = 0;
-    while(*str) {
+    while (*str) {
         count++;
         str++;
     }
@@ -83,31 +89,35 @@ void client_chat() {
         set_verbosity(1);
     }
 
+    /* install signal handling */
     sig.sa_handler = client_close;
     sigaction(SIGINT, &sig, NULL);
 
     while (1) {
-        if (poll(&pfd, 1, 100) == -1) {
+        /* listen for server messages in a non-blocking fashion. */
+        if (poll(&pfd, 1, TIMEOUT) == -1) {
             perror("poll");
             exit(404);
         }
+        /* if there is a message to read, read it. */
         if (pfd.revents & POLLIN) {
-            /*printf("Client is receiving message\n");*/
             server_msg = calloc(MSG_SIZE, 1);
             if ((size_read = recv(fd, server_msg, MSG_SIZE, 0)) == -1) {
                 perror("recv");
                 exit(200);
             }
+            /* display message */
             write_to_output(server_msg, message_length(server_msg));
             free(server_msg);
 
         } else {
+            /* listen for client messages in a non-blocking fashion. */
             if (poll(&input, 1, 100) == -1) {
                 perror("poll");
                 exit(402);
             }
+            /* if there is a message to write, write it. */
             if (input.revents & POLLIN) {
-                /*printf("Client is sending message\n");*/
                 client_msg = calloc(MSG_SIZE, 1);
                 read_from_input(client_msg, MSG_SIZE);
                 if ((send(fd, client_msg, MSG_SIZE, 0)) == -1) {
@@ -115,9 +125,7 @@ void client_chat() {
                     exit(205);
                 }
                 free(client_msg);
-                /*printf("Client message sent\n");*/
                 fflush(stdin);
-
             }
         }
     }
@@ -142,17 +150,19 @@ void server_chat() {
         start_windowing();
         set_verbosity(1);
     }
+    
+    /* install signal handling */
     sig.sa_handler = server_close;
     sigaction(SIGINT, &sig, NULL);
 
     while (1) {
+        /* listen for client messages in a non-blocking fashion */
         if (poll(&pfd, 1, 100) == -1) {
             perror("poll");
             exit(400);
         }
+        /* if there is a message to read, read it. */
         if (pfd.revents & POLLIN) {
-
-            /*printf("Server is receiving message\n");*/
             client_msg = calloc(MSG_SIZE, 1);
             if ((size_read = recv(accept_fd, client_msg, MSG_SIZE, 0)) == -1) {
                 perror("send");
@@ -160,14 +170,13 @@ void server_chat() {
             }
             write_to_output(client_msg, message_length(client_msg));
             free(client_msg);
-
         } else {
+            /* listen for server messages in a non-blocking fashion */
             if (poll(&input, 1, 100) == -1) {
                 perror("poll");
                 exit(403);
             }
             if (input.revents & POLLIN) {
-                /*printf("Server is sending message\n");*/
                 server_msg = calloc(MSG_SIZE, 1);
                 read_from_input(server_msg, MSG_SIZE);
                 if ((send(accept_fd, server_msg, MSG_SIZE, 0)) == -1) {
@@ -175,9 +184,7 @@ void server_chat() {
                     exit(203);
                 }
                 free(server_msg);
-                /*printf("Server message sent\n");*/
                 fflush(stdin);
-
             }
         }
     }
@@ -199,17 +206,14 @@ void start_client(char *hostname, char *port) {
     pollfd->fd = fd;
     pollfd->events = POLLIN;
 
+    /* figure out where to connect to */
     he = gethostbyname(hostname);
     if (he == NULL) {
         herror("gethostbyname");
         exit(50);
     }
 
-    /*
-    printf("hostname: %s\n", hostname);
-    printf("ip: %d\n", inet_addr(inet_ntoa(*(struct in_addr *) he->h_addr)));
-     */
-
+    /* initialize a socket */
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket");
         exit(60);
@@ -219,26 +223,27 @@ void start_client(char *hostname, char *port) {
         printf("Client socket created\n");
     }
 
+    /* clear the sock adder and fill */
     memset(&sa, 0, sizeof(sa));
     sa.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr *) he->h_addr));
     sa.sin_port = convert_port(port);
     sa.sin_family = AF_INET;
-    /*printf("IP address: %s\n", inet_ntoa(*(struct in_addr *) he->h_addr));*/
+    
+    /* connect to server */
     if ((connect(fd, (const struct sockaddr *) &sa, sizeof(sa))) == -1) {
         perror("connect");
         exit(70);
     }
 
+    /* send the server who is trying to connect. */
     user_address = get_user(getuid());
-    strcat(user_address, "@");
-    strcat(user_address, hostname);
-
-    /*printf("%s\n", user_address);*/
-    if ((send(fd, user_address, 100, 0)) == -1) {
+    if ((send(fd, user_address, 1000, 0)) == -1) {
         perror("send");
         exit(245);
     }
+    
     free(user_address);
+    /* handshake with the server to connect */
     if (!aflag) {
         printf("Waiting for response from %s\n", hostname);
         server_response = malloc(100);
@@ -262,13 +267,17 @@ void start_server(char *port) {
     char response[4];
     struct sockaddr_in sa;
     socklen_t sa_addr_size;
+    struct hostent *hostent;
     char *client_request;
+    
+    /* clear and set up the sockaddr */
     memset(&sa, 0, sizeof(sa));
     sa.sin_addr.s_addr = INADDR_ANY;
     sa.sin_port = convert_port(port);
     sa.sin_family = AF_INET;
 
-
+    
+    /* initialize the socket */
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket");
         exit(20);
@@ -278,6 +287,7 @@ void start_server(char *port) {
         printf("Server socket created\n");
     }
 
+    /* bind the sockaddr */
     if ((bind(fd, (const struct sockaddr *) &sa, sizeof(sa))) == -1) {
         perror("bind");
         exit(10);
@@ -287,6 +297,7 @@ void start_server(char *port) {
         printf("Successful bind to port %s\n", port);
     }
 
+    /* listen for connections to the server */
     if ((listen(fd, BACKLOG)) == -1) {
         perror("listen\n");
         exit(30);
@@ -296,20 +307,29 @@ void start_server(char *port) {
         printf("Listening on port %s\n", port);
     }
 
+    /* accept any connections */
     sa_addr_size = sizeof(struct sockaddr_in);
-
     accept_fd = accept(fd, (struct sockaddr *) &sa, &sa_addr_size);
     if (accept_fd == -1) {
         perror("accept");
         exit(40);
     }
+
+    /* figure out what server the client is connecting from */
+    hostent = gethostbyaddr(&(sa.sin_addr), sizeof(sa.sin_addr), AF_INET);
+    if (hostent == NULL) {
+        perror("hostent");
+        exit(492);
+    }
+
+    /* handshake with the client to establish a valid connection */
     if (!aflag) {
         client_request = malloc(100);
         if ((recv(accept_fd, client_request, 100, 0)) == -1) {
             perror("recv");
             exit(237);
         }
-        printf("Mytalk request from %s. Accept (y/n)?\n", client_request);
+        printf("Mytalk request from %s@%s. Accept (y/n)?\n", client_request, hostent->h_name);
         free(client_request);
         fgets(response, sizeof(response) + 1, stdin);
         if (strcmp(response, "y\n") == 0 || strcmp(response, "yes\n") == 0) {
@@ -322,12 +342,19 @@ void start_server(char *port) {
             printf("Not accepted\n");
         }
     } else {
+
+        /* automatically accept the connection */
         client_request = malloc(100);
         if ((recv(accept_fd, client_request, 100, 0)) == -1) {
             perror("recv");
             exit(237);
         }
         free(client_request);
+        if ((send(accept_fd, "ok", 2, 0)) == -1) {
+            perror("send");
+            exit(532);
+        }
+
         server_chat();
     }
 
