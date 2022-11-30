@@ -7,10 +7,32 @@
 #include <assert.h>
 #include "mush.h"
 
+#define READ 0
+#define WRITE 1
+
 void execute_command(char **argv) {
     if((execvp(argv[0], argv)) == -1) {
-        perror("execvp");
+        perror(argv[0]);
         _exit(2);
+    }
+}
+
+void close_pipes(int *old, int *new) {
+    if((close(old[READ]) == -1)) {
+        perror("close old read");
+        exit(11);
+    }
+    if((close(old[WRITE]) == -1)) {
+        perror("close old write");
+        exit(12);
+    }
+    if((close(new[READ]) == -1)) {
+        perror("close new read");
+        exit(11);
+    }
+    if((close(new[WRITE]) == -1)) {
+        perror("close new write");
+        exit(12);
     }
 }
 
@@ -19,9 +41,12 @@ void shell() {
     int i;
     char *user_input;
     struct pipeline *pl;
-    int fd[2];
+    int old[2];
+    int new[2];
 
     while(1) {
+        fflush(stdin);
+        fflush(stdout);
         printf("8-P ");
         user_input = readLongString(stdin);
         if(feof(stdin)) {
@@ -29,75 +54,97 @@ void shell() {
             free(user_input);
             exit(0);
         }
+        if(strcmp(user_input, "") == 0) {
+            continue;
+        }
         pl = crack_pipeline(user_input);
-        pipe(fd);
+        print_pipeline(stdout, pl);
+        if(pl->length == 0) {
+            continue;
+        }
+        if(strcmp(pl->stage->argv[0], "cd") == 0) {
+            if(pl->length > 1) {
+                fprintf(stderr, "usage: cd <dir>\n");
+
+            } else {
+                chdir(pl->stage->argv[1]);
+            }
+            continue;
+        }
+        pipe(old);
+        pipe(new);
         i = 0;
         while(i < pl->length) {
+            /*printf("FORKING\n");*/
             pid = fork();
             if(pid < 0) {
                 perror("pid");
                 exit(10);
             }
             if(pid == 0) {
+                /* no piping needed, one command */
                 if(i == 0 && pl->length == 1) {
+                    /*printf("RUNNING IN CHILD 0: %s\n", pl->stage->argv[0]);*/
+                    close_pipes(old, new);
                     execute_command(pl->stage->argv);
                 }
-                if(i == 0) {
-                    dup2(fd[1], STDOUT_FILENO);
-                    if((close(fd[0]) == -1)) {
-                        perror("close1");
-                        exit(11);
+                /* first pipe */
+                else if(i == 0) {
+                    /*printf("RUNNING IN CHILD FIRST PIPE: %s\n", pl->stage->argv[0]);*/
+                    if((dup2(old[WRITE], STDOUT_FILENO)) == -1) {
+                        perror("dup2");
+                        exit(13);
                     }
-                    if((close(fd[1]) == -1)) {
-                        perror("close2");
-                        exit(12);
-                    }
+                    close_pipes(old, new);
                     execute_command(pl->stage->argv);
                 }
+                /* last pipe but only two commands */
+                else if(i == pl->length - 1 && pl->length == 2) {
+                    if((dup2(old[READ], STDIN_FILENO)) == -1) {
+                        perror("dup2");
+                        exit(13);
+                    }
+                    close_pipes(old, new);
+                    execute_command(pl->stage->argv);
+                }
+                /* last pipe */
                 else if(i == pl->length - 1) {
-                    dup2(fd[0], STDIN_FILENO);
-                    if((close(fd[0]) == -1)) {
-                        perror("close3");
-                        exit(13);
-                    }
-                    if((close(fd[1]) == -1)) {
-                        perror("close4");
+                    /*printf("RUNNING IN CHILD LAST PIPE: %s\n", pl->stage->argv[0]);*/
+                    if((dup2(new[READ], STDIN_FILENO)) == -1) {
+                        perror("dup2");
                         exit(14);
                     }
-                    execute_command(pl->stage->argv);
-                } else {
-                    dup2(fd[0], STDIN_FILENO);
-                    dup2(fd[1], STDOUT_FILENO);
-                    if((close(fd[0]) == -1)) {
-                        perror("close5");
-                        exit(13);
-                    }
-                    if((close(fd[1]) == -1)) {
-                        perror("close6");
-                        exit(14);
-                    }
+                    close_pipes(old, new);
                     execute_command(pl->stage->argv);
                 }
-            }
-            if(i == 0) {
-                printf("RUNNING\n");
-                if((close(fd[0]) == -1)) {
-                    perror("close7");
-                    exit(15);
-                }
-                if((close(fd[1]) == -1)) {
-                    perror("close8");
-                    exit(16);
+                /* middle pipes */
+                else {
+                    /*printf("RUNNING IN CHILD MIDDLE PIPE: %s\n", pl->stage->argv[0]);*/
+                    if((dup2(old[READ], STDIN_FILENO)) == -1) {
+                        perror("dup2");
+                        exit(15);
+                    }
+                    if((dup2(new[WRITE], STDOUT_FILENO)) == -1) {
+                        perror("dup2");
+                        exit(16);
+                    }
+                    close_pipes(old, new);
+                    execute_command(pl->stage->argv);
                 }
             }
             i++;
             pl->stage++;
+            fflush(stdin);
         }
-        wait(NULL);
+        close_pipes(old, new);
+        for( ; i > 0; i--) {
+            wait(NULL);
+        }
     }
 }
 
 void sigquit_handle() {
+    fflush(stdin);
     printf("\n");
     shell();
 }
