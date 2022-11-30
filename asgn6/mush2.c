@@ -8,7 +8,6 @@
 #include "mush.h"
 #include <fcntl.h>
 
-
 #define READ 0
 #define WRITE 1
 
@@ -38,7 +37,7 @@ void close_pipes(int *old, int *new) {
     }
 }
 
-void shell(FILE *input) {
+void shell(FILE *input, int file) {
     int pid;
     int i;
     char *user_input;
@@ -51,53 +50,77 @@ void shell(FILE *input) {
     while(1) {
         fflush(stdin);
         fflush(stdout);
-        printf("8-P ");
+        if(!file) {
+            printf("8-P ");
+        }
         user_input = readLongString(input);
         if(feof(input)) {
-            yylex_destroy();
             free(user_input);
+            yylex_destroy();
             exit(0);
         }
         if(strcmp(user_input, "") == 0) {
             continue;
         }
         pl = crack_pipeline(user_input);
-        /*print_pipeline(stdout, pl);*/
+        if(pl == NULL) {
+            shell(stdin, 0);
+        }
         if(pl->length == 0) {
             continue;
         }
         if(strcmp(pl->stage->argv[0], "cd") == 0) {
             if(pl->length > 1) {
                 fprintf(stderr, "usage: cd <dir>\n");
-
             } else {
-                chdir(pl->stage->argv[1]);
+                if((chdir(pl->stage->argv[1])) == -1) {
+                    perror(pl->stage->argv[1]);
+                    shell(stdin, 0);
+                }
             }
             continue;
         }
-        pipe(old);
-        pipe(new);
+        if((pipe(old)) == -1) {
+            perror("pipe");
+            exit(-1);
+        }
+        if((pipe(new)) == -1) {
+            perror("pipe");
+            exit(-1);
+        }
         i = 0;
         while(i < pl->length) {
-            /*printf("FORKING\n");*/
             pid = fork();
             if(pid < 0) {
                 perror("pid");
-                exit(10);
+                exit(-1);
             }
             if(pid == 0) {
                 if(pl->stage->inname != NULL) {
-                    input_fd = open(pl->stage->inname, O_RDONLY, 0);
-                    dup2(input_fd, STDIN_FILENO);
+                    if((input_fd = open(pl->stage->inname, O_RDONLY, 0)) == -1) {
+                        perror("open");
+                        exit(-1);
+                    }
+                    if((dup2(input_fd, STDIN_FILENO)) == -1) {
+                        perror("dup2");
+                        exit(-1);
+                    }
                 }
                 if(pl->stage->outname != NULL) {
-                    output_fd = open(pl->stage->outname, O_CREAT | O_RDWR, 0777);
-                    dup2(output_fd, STDOUT_FILENO);
+                    if((output_fd = open(pl->stage->outname, O_CREAT | O_RDWR, 0666)) == -1) {
+                        perror("open");
+                        exit(-1);
+                    }
+                    if((dup2(output_fd, STDOUT_FILENO)) == -1) {
+                        perror("dup2");
+                        exit(-1);
+                    }
                 }
                 /* no piping needed, one command */
                 if(i == 0 && pl->length == 1) {
                     /*printf("RUNNING IN CHILD 0: %s\n", pl->stage->argv[0]);*/
                     close_pipes(old, new);
+                    yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
                 /* first pipe */
@@ -105,18 +128,20 @@ void shell(FILE *input) {
                     /*printf("RUNNING IN CHILD FIRST PIPE: %s\n", pl->stage->argv[0]);*/
                     if((dup2(old[WRITE], STDOUT_FILENO)) == -1) {
                         perror("dup2");
-                        exit(13);
+                        exit(-1);
                     }
                     close_pipes(old, new);
+                    yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
                 /* last pipe but only two commands */
                 else if(i == pl->length - 1 && pl->length == 2) {
                     if((dup2(old[READ], STDIN_FILENO)) == -1) {
                         perror("dup2");
-                        exit(13);
+                        exit(-1);
                     }
                     close_pipes(old, new);
+                    yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
                 /* last pipe */
@@ -124,9 +149,10 @@ void shell(FILE *input) {
                     /*printf("RUNNING IN CHILD LAST PIPE: %s\n", pl->stage->argv[0]);*/
                     if((dup2(new[READ], STDIN_FILENO)) == -1) {
                         perror("dup2");
-                        exit(14);
+                        exit(-1);
                     }
                     close_pipes(old, new);
+                    yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
                 /* middle pipes */
@@ -134,13 +160,14 @@ void shell(FILE *input) {
                     /*printf("RUNNING IN CHILD MIDDLE PIPE: %s\n", pl->stage->argv[0]);*/
                     if((dup2(old[READ], STDIN_FILENO)) == -1) {
                         perror("dup2");
-                        exit(15);
+                        exit(-1);
                     }
                     if((dup2(new[WRITE], STDOUT_FILENO)) == -1) {
                         perror("dup2");
-                        exit(16);
+                        exit(-1);
                     }
                     close_pipes(old, new);
+                    yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
             }
@@ -158,7 +185,7 @@ void shell(FILE *input) {
 void sigquit_handle() {
     fflush(stdin);
     printf("\n");
-    shell(stdin);
+    shell(stdin, 0);
 }
 
 int main(int argc, char *argv[]) {
@@ -171,11 +198,15 @@ int main(int argc, char *argv[]) {
         exit(4);
     }
     if(argc == 1) {
-        shell(stdin);
+        shell(stdin, 0);
     }
     else if(argc == 2) {
         input = fopen(argv[1], "r");
-        shell(input);
+        if(input == NULL) {
+            perror("fopen");
+            exit(-1);
+        }
+        shell(input, 1);
     }
     yylex_destroy();
     return 0;
