@@ -6,6 +6,8 @@
 #include <sys/wait.h>
 #include <assert.h>
 #include "mush.h"
+#include <fcntl.h>
+
 
 #define READ 0
 #define WRITE 1
@@ -36,20 +38,22 @@ void close_pipes(int *old, int *new) {
     }
 }
 
-void shell() {
+void shell(FILE *input) {
     int pid;
     int i;
     char *user_input;
     struct pipeline *pl;
     int old[2];
     int new[2];
+    int input_fd;
+    int output_fd;
 
     while(1) {
         fflush(stdin);
         fflush(stdout);
         printf("8-P ");
-        user_input = readLongString(stdin);
-        if(feof(stdin)) {
+        user_input = readLongString(input);
+        if(feof(input)) {
             yylex_destroy();
             free(user_input);
             exit(0);
@@ -58,7 +62,7 @@ void shell() {
             continue;
         }
         pl = crack_pipeline(user_input);
-        print_pipeline(stdout, pl);
+        /*print_pipeline(stdout, pl);*/
         if(pl->length == 0) {
             continue;
         }
@@ -82,6 +86,14 @@ void shell() {
                 exit(10);
             }
             if(pid == 0) {
+                if(pl->stage->inname != NULL) {
+                    input_fd = open(pl->stage->inname, O_RDONLY, 0);
+                    dup2(input_fd, STDIN_FILENO);
+                }
+                if(pl->stage->outname != NULL) {
+                    output_fd = open(pl->stage->outname, O_CREAT | O_RDWR, 0777);
+                    dup2(output_fd, STDOUT_FILENO);
+                }
                 /* no piping needed, one command */
                 if(i == 0 && pl->length == 1) {
                     /*printf("RUNNING IN CHILD 0: %s\n", pl->stage->argv[0]);*/
@@ -146,10 +158,11 @@ void shell() {
 void sigquit_handle() {
     fflush(stdin);
     printf("\n");
-    shell();
+    shell(stdin);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    FILE *input;
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sigquit_handle;
@@ -157,7 +170,13 @@ int main() {
         perror("sigaction");
         exit(4);
     }
-    shell();
+    if(argc == 1) {
+        shell(stdin);
+    }
+    else if(argc == 2) {
+        input = fopen(argv[1], "r");
+        shell(input);
+    }
     yylex_destroy();
     return 0;
 }
