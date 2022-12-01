@@ -7,31 +7,33 @@
 #include <assert.h>
 #include "mush.h"
 #include <fcntl.h>
+#include <errno.h>
+#include <sys/errno.h>
 
 #define READ 0
 #define WRITE 1
 
 void execute_command(char **argv) {
-    if((execvp(argv[0], argv)) == -1) {
+    if ((execvp(argv[0], argv)) == -1) {
         perror(argv[0]);
         _exit(2);
     }
 }
 
 void close_pipes(int *old, int *new) {
-    if((close(old[READ]) == -1)) {
+    if ((close(old[READ]) == -1)) {
         perror("close old read");
         exit(11);
     }
-    if((close(old[WRITE]) == -1)) {
+    if ((close(old[WRITE]) == -1)) {
         perror("close old write");
         exit(12);
     }
-    if((close(new[READ]) == -1)) {
+    if ((close(new[READ]) == -1)) {
         perror("close new read");
         exit(11);
     }
-    if((close(new[WRITE]) == -1)) {
+    if ((close(new[WRITE]) == -1)) {
         perror("close new write");
         exit(12);
     }
@@ -47,86 +49,94 @@ void shell(FILE *input, int file) {
     int input_fd;
     int output_fd;
 
-    while(1) {
+    while (1) {
         fflush(stdin);
         fflush(stdout);
-        if(!file) {
+        if (!file) {
             printf("8-P ");
         }
         user_input = readLongString(input);
-        if(feof(input)) {
-            free(user_input);
+        if (errno == EINTR) {
+            if (feof(input)) {
+                yylex_destroy();
+                exit(0);
+            }
+            errno = 0;
+            continue;
+        }
+        if (feof(input)) {
             yylex_destroy();
             exit(0);
         }
-        if(strcmp(user_input, "") == 0) {
+        if (strcmp(user_input, "") == 0) {
             continue;
         }
         pl = crack_pipeline(user_input);
-        if(pl == NULL) {
+        if (pl == NULL) {
             shell(stdin, 0);
         }
-        if(pl->length == 0) {
+        if (pl->length == 0) {
             continue;
         }
-        if(strcmp(pl->stage->argv[0], "cd") == 0) {
-            if(pl->length > 1) {
+        if (strcmp(pl->stage->argv[0], "cd") == 0) {
+            if (pl->length > 1) {
                 fprintf(stderr, "usage: cd <dir>\n");
             } else {
-                if((chdir(pl->stage->argv[1])) == -1) {
+                if ((chdir(pl->stage->argv[1])) == -1) {
                     perror(pl->stage->argv[1]);
                     shell(stdin, 0);
                 }
             }
             continue;
         }
-        if((pipe(old)) == -1) {
+        if ((pipe(old)) == -1) {
             perror("pipe");
             exit(-1);
         }
-        if((pipe(new)) == -1) {
+        if ((pipe(new)) == -1) {
             perror("pipe");
             exit(-1);
         }
         i = 0;
-        while(i < pl->length) {
+        while (i < pl->length) {
             pid = fork();
-            if(pid < 0) {
+            if (pid < 0) {
                 perror("pid");
                 exit(-1);
             }
-            if(pid == 0) {
-                if(pl->stage->inname != NULL) {
-                    if((input_fd = open(pl->stage->inname, O_RDONLY, 0)) == -1) {
+            if (pid == 0) {
+                if (pl->stage->inname != NULL) {
+                    if ((input_fd = open(pl->stage->inname, O_RDONLY, 0)) == -1) {
                         perror("open");
                         exit(-1);
                     }
-                    if((dup2(input_fd, STDIN_FILENO)) == -1) {
+                    if ((dup2(input_fd, STDIN_FILENO)) == -1) {
                         perror("dup2");
                         exit(-1);
                     }
                 }
-                if(pl->stage->outname != NULL) {
-                    if((output_fd = open(pl->stage->outname, O_CREAT | O_RDWR, 0666)) == -1) {
+                if (pl->stage->outname != NULL) {
+                    if ((output_fd = open(pl->stage->outname, O_CREAT | O_RDWR,
+                                          S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) == -1) {
                         perror("open");
                         exit(-1);
                     }
-                    if((dup2(output_fd, STDOUT_FILENO)) == -1) {
+                    if ((dup2(output_fd, STDOUT_FILENO)) == -1) {
                         perror("dup2");
                         exit(-1);
                     }
                 }
                 /* no piping needed, one command */
-                if(i == 0 && pl->length == 1) {
+                if (i == 0 && pl->length == 1) {
                     /*printf("RUNNING IN CHILD 0: %s\n", pl->stage->argv[0]);*/
                     close_pipes(old, new);
                     yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
-                /* first pipe */
-                else if(i == 0) {
+                    /* first pipe */
+                else if (i == 0) {
                     /*printf("RUNNING IN CHILD FIRST PIPE: %s\n", pl->stage->argv[0]);*/
-                    if((dup2(old[WRITE], STDOUT_FILENO)) == -1) {
+                    if ((dup2(old[WRITE], STDOUT_FILENO)) == -1) {
                         perror("dup2");
                         exit(-1);
                     }
@@ -134,9 +144,9 @@ void shell(FILE *input, int file) {
                     yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
-                /* last pipe but only two commands */
-                else if(i == pl->length - 1 && pl->length == 2) {
-                    if((dup2(old[READ], STDIN_FILENO)) == -1) {
+                    /* last pipe but only two commands */
+                else if (i == pl->length - 1 && pl->length == 2) {
+                    if ((dup2(old[READ], STDIN_FILENO)) == -1) {
                         perror("dup2");
                         exit(-1);
                     }
@@ -144,10 +154,10 @@ void shell(FILE *input, int file) {
                     yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
-                /* last pipe */
-                else if(i == pl->length - 1) {
+                    /* last pipe */
+                else if (i == pl->length - 1) {
                     /*printf("RUNNING IN CHILD LAST PIPE: %s\n", pl->stage->argv[0]);*/
-                    if((dup2(new[READ], STDIN_FILENO)) == -1) {
+                    if ((dup2(new[READ], STDIN_FILENO)) == -1) {
                         perror("dup2");
                         exit(-1);
                     }
@@ -155,14 +165,14 @@ void shell(FILE *input, int file) {
                     yylex_destroy();
                     execute_command(pl->stage->argv);
                 }
-                /* middle pipes */
+                    /* middle pipes */
                 else {
                     /*printf("RUNNING IN CHILD MIDDLE PIPE: %s\n", pl->stage->argv[0]);*/
-                    if((dup2(old[READ], STDIN_FILENO)) == -1) {
+                    if ((dup2(old[READ], STDIN_FILENO)) == -1) {
                         perror("dup2");
                         exit(-1);
                     }
-                    if((dup2(new[WRITE], STDOUT_FILENO)) == -1) {
+                    if ((dup2(new[WRITE], STDOUT_FILENO)) == -1) {
                         perror("dup2");
                         exit(-1);
                     }
@@ -176,33 +186,30 @@ void shell(FILE *input, int file) {
             fflush(stdin);
         }
         close_pipes(old, new);
-        for( ; i > 0; i--) {
+        for (; i > 0; i--) {
             wait(NULL);
         }
     }
 }
 
 void sigquit_handle() {
-    fflush(stdin);
     printf("\n");
-    shell(stdin, 0);
 }
 
 int main(int argc, char *argv[]) {
     FILE *input;
     struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
+
     sa.sa_handler = sigquit_handle;
-    if((sigaction(SIGINT, &sa, NULL)) == -1) {
-        perror("sigaction");
-        exit(4);
-    }
-    if(argc == 1) {
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+
+    if (argc == 1) {
         shell(stdin, 0);
-    }
-    else if(argc == 2) {
+    } else if (argc == 2) {
         input = fopen(argv[1], "r");
-        if(input == NULL) {
+        if (input == NULL) {
             perror("fopen");
             exit(-1);
         }
