@@ -13,6 +13,7 @@
 #define READ 0
 #define WRITE 1
 
+/* executes a command */
 void execute_command(char **argv) {
     if ((execvp(argv[0], argv)) == -1) {
         perror(argv[0]);
@@ -20,6 +21,7 @@ void execute_command(char **argv) {
     }
 }
 
+/* closes pipes */
 void close_pipes(int *old, int *new) {
     if ((close(old[READ]) == -1)) {
         perror("close old read");
@@ -55,29 +57,42 @@ void shell(FILE *input, int file) {
         if (!file) {
             printf("8-P ");
         }
+        /* get user input from the command line */
         user_input = readLongString(input);
+
+        /* Logic for SIGINT */
         if (errno == EINTR) {
-            if (feof(input)) {
-                yylex_destroy();
-                exit(0);
-            }
+            /* SIGINT at this point */
+            fflush(stdin);
+            fflush(stderr);
             errno = 0;
             continue;
         }
+
+        /* Logic for ^D */
         if (feof(input)) {
             yylex_destroy();
             exit(0);
         }
+
+        /* If no input, just continue to next line prompt */
         if (strcmp(user_input, "") == 0) {
             continue;
         }
+
+        /* Split the user_input into stages based on pipes. Crack! */
         pl = crack_pipeline(user_input);
+
+        /* if crack_pipeline encounters an error */
         if (pl == NULL) {
             shell(stdin, 0);
         }
+
+        /*
         if (pl->length == 0) {
             continue;
         }
+         */
         if (strcmp(pl->stage->argv[0], "cd") == 0) {
             if (pl->length > 1) {
                 fprintf(stderr, "usage: cd <dir>\n");
@@ -106,7 +121,8 @@ void shell(FILE *input, int file) {
             }
             if (pid == 0) {
                 if (pl->stage->inname != NULL) {
-                    if ((input_fd = open(pl->stage->inname, O_RDONLY, 0)) == -1) {
+                    if ((input_fd = open(pl->stage->inname,
+                                         O_RDONLY, 0)) == -1) {
                         perror("open");
                         exit(-1);
                     }
@@ -117,7 +133,9 @@ void shell(FILE *input, int file) {
                 }
                 if (pl->stage->outname != NULL) {
                     if ((output_fd = open(pl->stage->outname, O_CREAT | O_RDWR,
-                                          S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) == -1) {
+                                          S_IRUSR | S_IWUSR | S_IRGRP
+                                          | S_IWGRP | S_IROTH
+                                          | S_IWOTH)) == -1) {
                         perror("open");
                         exit(-1);
                     }
@@ -185,10 +203,13 @@ void shell(FILE *input, int file) {
             pl->stage++;
             fflush(stdin);
         }
+        free(user_input);
         close_pipes(old, new);
         for (; i > 0; i--) {
+            pl->stage--;
             wait(NULL);
         }
+        free_pipeline(pl);
     }
 }
 
